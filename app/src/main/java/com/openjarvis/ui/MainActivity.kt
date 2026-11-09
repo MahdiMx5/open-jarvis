@@ -1,6 +1,8 @@
 package com.openjarvis.ui
 
+import android.Manifest
 import android.content.ComponentName
+import android.content.pm.PackageManager
 import android.content.Intent
 import android.os.Bundle
 import android.provider.Settings
@@ -16,6 +18,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import com.openjarvis.accessibility.JarvisAccessibilityService
 import com.openjarvis.graphify.GraphifyRepository
 import com.openjarvis.ui.dashboard.DashboardScreen
@@ -81,6 +85,18 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun startOverlayService() {
+        if (ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.RECORD_AUDIO
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            ActivityCompat.requestPermissions(
+                this,
+                arrayOf(Manifest.permission.RECORD_AUDIO),
+                AUDIO_PERMISSION_REQUEST
+            )
+        }
+
         try {
             OverlayService.start(this)
             Toast.makeText(this, "Jarvis is starting", Toast.LENGTH_SHORT).show()
@@ -95,6 +111,10 @@ class MainActivity : ComponentActivity() {
 
     private fun openSettings() {
         startActivity(Intent(this, SettingsActivity::class.java))
+    }
+
+    companion object {
+        private const val AUDIO_PERMISSION_REQUEST = 1001
     }
 }
 
