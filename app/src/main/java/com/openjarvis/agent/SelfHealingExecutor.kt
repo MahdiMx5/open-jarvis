@@ -10,7 +10,7 @@ class SelfHealingExecutor(private val context: Context) {
     
     private val screenReader = ScreenReader(context)
     private val graphifyRepo = GraphifyRepository(context)
-    private val llm = UniversalAdapter.getModelManager(context)
+    private val llm = UniversalAdapter(context)
     
     private val maxAttempts = 3
     private val baseDelayMs = 1000L
@@ -23,7 +23,7 @@ class SelfHealingExecutor(private val context: Context) {
         
         val result = tryExecuteAction(action, context)
         
-        if (result.success) return result
+        if (result is ActionResult.Success) return result
         
         if (attempt >= maxAttempts) {
             return ActionResult.Failed("Could not complete after $maxAttempts attempts")
@@ -42,7 +42,7 @@ class SelfHealingExecutor(private val context: Context) {
         delay(baseDelayMs * attempt)
         
         if (alternativeResponse != null) {
-            val alternativeAction = parseActionFromLLM(alternativeResponse)
+            val alternativeAction = alternativeResponse.getOrNull()?.let(::parseActionFromLLM)
             if (alternativeAction != null) {
                 return executeWithHealing(alternativeAction, context, attempt + 1)
             }
@@ -57,12 +57,12 @@ class SelfHealingExecutor(private val context: Context) {
             
             when (action.action) {
                 Action.TAP -> {
-                    val tapped = service?.tapByText(action.text ?: "")
-                    ActionResult.Success(if (tapped) "tapped ${action.text}" else "tap failed")
+                    val tapped = service?.tapByText(action.text ?: "") == true
+                    if (service == null) ActionResult.Failed("Accessibility service unavailable") else ActionResult.Success(if (tapped) "tapped ${action.text}" else "tap failed")
                 }
                 Action.TYPE -> {
-                    val typed = service?.typeText(action.value ?: "")
-                    ActionResult.Success(if (typed) "typed ${action.value}" else "type failed")
+                    val typed = service?.typeText(action.value ?: "") == true
+                    if (service == null) ActionResult.Failed("Accessibility service unavailable") else ActionResult.Success(if (typed) "typed ${action.value}" else "type failed")
                 }
                 Action.OPEN_APP -> {
                     service?.openAppByPackage(action.packageName ?: "")
@@ -86,7 +86,7 @@ class SelfHealingExecutor(private val context: Context) {
         attempt: Int
     ): Pair<String, String> {
         val system = """
-Action failed: ${action.description ?: action.action}
+Action failed: ${action.action}
 Expected to see: ${context.expectedState ?: "task completion"}
 Current screen shows: ${currentScreen.take(500)}
 Attempt: $attempt/$maxAttempts
