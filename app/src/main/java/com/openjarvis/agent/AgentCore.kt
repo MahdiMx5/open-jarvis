@@ -15,11 +15,13 @@ import com.openjarvis.intelligence.TaskWorkingMemory
 import com.openjarvis.llm.UniversalAdapter
 import com.openjarvis.vision.VisionModule
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -38,6 +40,7 @@ class AgentCore(private val context: Context) {
 
     private val scope = CoroutineScope(Dispatchers.IO)
     private val taskMutex = Mutex()
+    @Volatile private var pendingConfirmation: CompletableDeferred<Boolean>? = null
 
     private val _state =
         MutableStateFlow<AgentState>(AgentState.Idle)
@@ -279,6 +282,30 @@ RULES:
         }
     }
 
+    fun respondToPendingConfirmation(approved: Boolean) {
+        pendingConfirmation?.takeIf { it.isActive }?.complete(approved)
+    }
+
+    private suspend fun requestSensitiveInputConfirmation(
+        action: Action,
+        packageName: String
+    ): Boolean {
+        val confirmation = CompletableDeferred<Boolean>()
+        pendingConfirmation = confirmation
+        val preview = action.value.orEmpty().take(400)
+        _state.value = AgentState.AwaitingConfirmation(
+            "Sensitive app: $packageName\n\nText to enter:\n$preview\n\nConfirm only if this text and destination are correct."
+        )
+
+        return try {
+            withTimeoutOrNull(60_000L) { confirmation.await() } ?: false
+        } finally {
+            if (pendingConfirmation === confirmation) {
+                pendingConfirmation = null
+            }
+        }
+    }
+
     suspend fun testConnection(): Result<Long> {
         return universalAdapter.testConnection()
     }
@@ -342,7 +369,25 @@ RULES:
                 Action.TYPE -> {
                     val value = action.value
                     val service = JarvisAccessibilityService.instance
-                    if (value.isNullOrBlank() || service?.typeText(value) != true) {
+                    if (value.isNullOrBlank() || service == null) {
+                        _state.value = AgentState.Error("Could not type text: missing value or accessibility service")
+                        return
+                    }
+
+                    val activePackage = service.getActivePackageName()
+                    if (RiskyActionConfirmation.requiresInputConfirmation(activePackage)) {
+                        val approved = requestSensitiveInputConfirmation(
+                            action,
+                            activePackage ?: "unknown app"
+                        )
+                        if (!approved) {
+                            _state.value = AgentState.Error("Sensitive text entry was cancelled or timed out")
+                            return
+                        }
+                        _state.value = AgentState.Running("entering confirmed text...")
+                    }
+
+                    if (!service.typeText(value)) {
                         _state.value = AgentState.Error("Could not type text")
                         return
                     }
