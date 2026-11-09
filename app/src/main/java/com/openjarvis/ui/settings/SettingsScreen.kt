@@ -33,12 +33,15 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.openjarvis.llm.UniversalAdapter
+import com.openjarvis.voice.STTMode
+import com.openjarvis.voice.VoiceManager
 import com.openjarvis.ui.theme.VoidColor
 
 @Composable
 fun SettingsScreen(
     onNavigateBack: () -> Unit,
     onSaveProvider: (String, String, String, String) -> Unit,
+    voiceManager: VoiceManager,
     modifier: Modifier = Modifier
 ) {
     var selectedProvider by remember { mutableStateOf("Groq") }
@@ -50,10 +53,11 @@ fun SettingsScreen(
     var showPassword by remember { mutableStateOf(false) }
     var lastSaved by remember { mutableStateOf(0L) }
     var savedVisible by remember { mutableStateOf(false) }
-    var voiceEnabled by remember { mutableStateOf(false) }
-    var speakResults by remember { mutableStateOf(true) }
-    var speechRate by remember { mutableStateOf(1.05f) }
-    var sttMode by remember { mutableStateOf("Push to Talk") }
+    var voiceEnabled by remember { mutableStateOf(voiceManager.isVoiceEnabled()) }
+    var speakResults by remember { mutableStateOf(voiceManager.isSpeakResultsEnabled()) }
+    var speechRate by remember { mutableFloatStateOf(voiceManager.getSpeechRate()) }
+    var sttMode by remember { mutableStateOf(voiceManager.getSTTMode()) }
+    val sttModeLabel = if (sttMode == STTMode.PUSH_TO_TALK) "Push to Talk" else "Auto (VAD)"
     
     LaunchedEffect(selectedProvider) {
         showBaseUrlField = selectedProvider == "Custom"
@@ -153,7 +157,10 @@ fun SettingsScreen(
                     title = "Voice Assistant",
                     subtitle = "Push to Talk · VAD supported",
                     enabled = voiceEnabled,
-                    onToggle = { voiceEnabled = !voiceEnabled }
+                    onToggle = {
+                        voiceEnabled = !voiceEnabled
+                        voiceManager.setVoiceEnabled(voiceEnabled)
+                    }
                 )
                 
                 if (voiceEnabled) {
@@ -163,7 +170,10 @@ fun SettingsScreen(
                         title = "Speak Results",
                         subtitle = "Jarvis reads results aloud",
                         enabled = speakResults,
-                        onToggle = { speakResults = !speakResults }
+                        onToggle = {
+                            speakResults = !speakResults
+                            voiceManager.setSpeakResultsEnabled(speakResults)
+                        }
                     )
                     
                     Spacer(modifier = Modifier.height(8.dp))
@@ -179,7 +189,8 @@ fun SettingsScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clickable { 
-                                    sttMode = if (sttMode == "Push to Talk") "Auto (VAD)" else "Push to Talk"
+                                    sttMode = if (sttMode == STTMode.PUSH_TO_TALK) STTMode.AUTO_VAD else STTMode.PUSH_TO_TALK
+                                    voiceManager.setSTTMode(sttMode)
                                 }
                                 .padding(16.dp),
                             verticalAlignment = Alignment.CenterVertically
@@ -195,9 +206,9 @@ fun SettingsScreen(
                                     )
                                 )
                                 Text(
-                                    text = if (sttMode == "Push to Talk") 
-                                        "Hold mic to record, release to send" 
-                                    else 
+                                    text = if (sttMode == STTMode.PUSH_TO_TALK)
+                                        "Hold mic to record, release to send"
+                                    else
                                         "Tap to record, auto-sends on silence",
                                     style = TextStyle(
                                         fontFamily = FontFamily.Default,
@@ -208,7 +219,7 @@ fun SettingsScreen(
                                 )
                             }
                             Text(
-                                text = sttMode,
+                                text = sttModeLabel,
                                 style = TextStyle(
                                     fontFamily = FontFamily.Default,
                                     fontWeight = FontWeight(500),
@@ -221,6 +232,23 @@ fun SettingsScreen(
                     
                     Spacer(modifier = Modifier.height(8.dp))
                     
+                    Text(
+                        text = "Speech rate: ${"%.2f".format(speechRate)}x",
+                        style = TextStyle(
+                            fontFamily = FontFamily.Default,
+                            fontSize = 12.sp,
+                            color = VoidColor.TextSecondary
+                        )
+                    )
+                    Slider(
+                        value = speechRate,
+                        onValueChange = {
+                            speechRate = it
+                            voiceManager.setSpeechRate(it)
+                        },
+                        valueRange = 0.5f..2.0f
+                    )
+
                     // Model status
                     Surface(
                         modifier = Modifier.fillMaxWidth(),
