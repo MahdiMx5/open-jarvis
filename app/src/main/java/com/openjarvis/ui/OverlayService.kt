@@ -7,20 +7,15 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
-import android.graphics.PixelFormat
 import android.os.IBinder
-import android.view.Gravity
+import android.util.Log
 import android.view.WindowManager
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
 import androidx.core.app.NotificationCompat
 import com.openjarvis.R
 import com.openjarvis.agent.AgentCore
-import com.openjarvis.agent.AgentState
 import com.openjarvis.bridge.SocketServer
 import com.openjarvis.graphify.GraphifyRepository
 import com.openjarvis.graphify.nodes.TaskNode
-import com.openjarvis.ui.overlay.FloatingOverlayWidget
 import com.openjarvis.voice.VoiceManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -32,56 +27,65 @@ import kotlinx.coroutines.withContext
 class OverlayService : Service() {
 
     private var windowManager: WindowManager? = null
-    
+
     private lateinit var agentCore: AgentCore
     private lateinit var voiceManager: VoiceManager
     private lateinit var graphifyRepo: GraphifyRepository
     private lateinit var socketServer: SocketServer
     private var stateCollectJob: Job? = null
     private var recentTasks = emptyList<TaskNode>()
-    
+
     private var isInitialized = false
 
     override fun onCreate() {
         super.onCreate()
-        
-        agentCore = AgentCore(this)
-        voiceManager = VoiceManager(this)
-        graphifyRepo = GraphifyRepository(this)
-        socketServer = SocketServer(this, agentCore, graphifyRepo)
-        
+
+        // Promote the service before doing database, crypto, or AI initialization.
         startForeground(NOTIFICATION_ID, createNotification())
-        
+
+        try {
+            graphifyRepo = GraphifyRepository(applicationContext)
+            agentCore = AgentCore(applicationContext)
+            voiceManager = VoiceManager(applicationContext)
+            socketServer = SocketServer(applicationContext, agentCore, graphifyRepo)
+        } catch (error: Exception) {
+            Log.e(TAG, "Unable to initialize overlay service", error)
+            stopForeground(STOP_FOREGROUND_REMOVE)
+            stopSelf()
+            return
+        }
+
         CoroutineScope(Dispatchers.Main).launch {
-            delay(0)
             initializeServices()
         }
-        
+
         socketServer.start()
-        
-        // Load recent tasks
+
         CoroutineScope(Dispatchers.IO).launch {
-            recentTasks = graphifyRepo.getRecentTasks(10)
+            runCatching {
+                recentTasks = graphifyRepo.getRecentTasks(10)
+            }.onFailure {
+                Log.e(TAG, "Unable to load recent tasks", it)
+            }
         }
     }
-    
+
     private suspend fun initializeServices() {
         if (isInitialized) return
         isInitialized = true
-        
-        // Heavy initializations deferred here
+
         withContext(Dispatchers.IO) {
             try {
                 graphifyRepo.getRecentTasks(10)
-            } catch (e: Exception) {
-                // Graphify initialization
+            } catch (error: Exception) {
+                Log.e(TAG, "Graphify initialization failed", error)
             }
         }
-        
+
         try {
             voiceManager.initialize()
-        } catch (e: Exception) {
-            // Voice initialization
+        } catch (error: Exception) {
+            Log.e(TAG, "Voice initialization failed", error)
         }
     }
 
@@ -92,10 +96,10 @@ class OverlayService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onDestroy() {
-        super.onDestroy()
         stateCollectJob?.cancel()
-        socketServer.stop()
-        voiceManager.release()
+        if (::socketServer.isInitialized) socketServer.stop()
+        if (::voiceManager.isInitialized) voiceManager.release()
+        super.onDestroy()
     }
 
     private fun createNotification(): Notification {
@@ -106,17 +110,17 @@ class OverlayService : Service() {
         ).apply {
             description = getString(R.string.notification_channel_description)
         }
-        
+
         val notificationManager = getSystemService(NotificationManager::class.java)
         notificationManager.createNotificationChannel(channel)
-        
+
         val pendingIntent = PendingIntent.getActivity(
             this,
             0,
             Intent(this, MainActivity::class.java),
             PendingIntent.FLAG_IMMUTABLE
         )
-        
+
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle(getString(R.string.notification_title))
             .setContentText(getString(R.string.notification_text))
@@ -131,16 +135,22 @@ class OverlayService : Service() {
     fun getRecentTasks() = recentTasks
 
     fun executeCommand(command: String) {
+        if (!::agentCore.isInitialized || !::graphifyRepo.isInitialized) return
+
         agentCore.executeTask(command)
-        
-        // Refresh tasks after execution
+
         CoroutineScope(Dispatchers.IO).launch {
             delay(1000)
-            recentTasks = graphifyRepo.getRecentTasks(10)
+            runCatching {
+                recentTasks = graphifyRepo.getRecentTasks(10)
+            }.onFailure {
+                Log.e(TAG, "Unable to refresh recent tasks", it)
+            }
         }
     }
 
     companion object {
+        private const val TAG = "OpenJarvisOverlay"
         private const val CHANNEL_ID = "jarvis_overlay_channel"
         private const val NOTIFICATION_ID = 1
 
