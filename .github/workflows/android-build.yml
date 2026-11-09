@@ -2,7 +2,7 @@
 
 on:
   push:
-    branches: ["main"]
+    branches: ["main", "fix/kotlin-build-errors"]
   workflow_dispatch:
 
 permissions:
