@@ -41,6 +41,11 @@ class MCPClient(
 
             val request = Request.Builder()
                 .url(server.url)
+                .apply {
+                    server.apiKey?.takeIf { it.isNotBlank() }?.let {
+                        addHeader("Authorization", "Bearer $it")
+                    }
+                }
                 .post(requestBody.toRequestBody(jsonMediaType))
                 .build()
 
@@ -81,6 +86,11 @@ class MCPClient(
 
             val request = Request.Builder()
                 .url(server.url)
+                .apply {
+                    server.apiKey?.takeIf { it.isNotBlank() }?.let {
+                        addHeader("Authorization", "Bearer $it")
+                    }
+                }
                 .post(requestBody.toRequestBody(jsonMediaType))
                 .build()
 
@@ -139,6 +149,11 @@ class MCPClient(
 
             val request = Request.Builder()
                 .url(server.url)
+                .apply {
+                    server.apiKey?.takeIf { it.isNotBlank() }?.let {
+                        addHeader("Authorization", "Bearer $it")
+                    }
+                }
                 .post(requestBody.toRequestBody(jsonMediaType))
                 .build()
 
