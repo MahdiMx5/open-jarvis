@@ -8,11 +8,13 @@ import com.openjarvis.graphify.GraphifyRepository
 import com.openjarvis.accessibility.JarvisAccessibilityService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 
 class JarvisNotificationListener : NotificationListenerService() {
     
-    private val scope = CoroutineScope(Dispatchers.IO)
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var graphifyRepo: GraphifyRepository? = null
     private val notifications = mutableListOf<JarvisNotification>()
     
@@ -42,6 +44,18 @@ class JarvisNotificationListener : NotificationListenerService() {
         }
     }
     
+    override fun onListenerConnected() {
+        super.onListenerConnected()
+        graphifyRepo = GraphifyRepository(applicationContext)
+    }
+
+    override fun onDestroy() {
+        scope.cancel()
+        notifications.clear()
+        graphifyRepo = null
+        super.onDestroy()
+    }
+
     override fun onNotificationPosted(sbn: StatusBarNotification) {
         if (!shouldProcessNotification(sbn.packageName)) {
             return
