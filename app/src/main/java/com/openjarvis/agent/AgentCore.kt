@@ -294,7 +294,7 @@ RULES:
         pendingConfirmation = confirmation
         val preview = action.value.orEmpty().take(400)
         _state.value = AgentState.AwaitingConfirmation(
-            "Sensitive app: $packageName\n\nText to enter:\n$preview\n\nConfirm only if this text and destination are correct."
+            "Sensitive app: $packageName\n\nText to enter:\n$preview\n\nConfirming lets Jarvis enter this text and continue the remaining steps. It may send or submit the text. Approve only if the destination and content are correct."
         )
 
         return try {
