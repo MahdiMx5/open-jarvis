@@ -51,31 +51,43 @@ class AppBuilderMode(private val context: Context) {
     }
     
     suspend fun generateProject(spec: AppSpec) = withContext(Dispatchers.IO) {
-        val projectDir = File(outputDir, spec.packageSafeName).also { it.mkdirs() }
-        
+        val safeSpec = spec.copy(
+            packageSafeName = sanitizeProjectName(spec.packageSafeName),
+            screens = spec.screens.map { it.copy(name = sanitizeScreenName(it.name)) }
+        )
+        val canonicalOutput = outputDir.canonicalFile
+        val projectDir = File(canonicalOutput, safeSpec.packageSafeName).canonicalFile
+        require(projectDir.path.startsWith(canonicalOutput.path + File.separator)) {
+            "Invalid generated project directory"
+        }
+        projectDir.mkdirs()
+
         _state.value = BuildState.Generating("build.gradle", 0)
-        
-        val filesToGenerate = buildFileList(spec)
-        
+
+        val filesToGenerate = buildFileList(safeSpec)
+
         filesToGenerate.forEachIndexed { index, fileSpec ->
             _state.value = BuildState.Generating(
                 fileSpec.path,
                 (index * 100 / filesToGenerate.size)
             )
-            
-            val content = generateFileContent(fileSpec, spec)
-            val file = File(projectDir, fileSpec.path)
+
+            val content = generateFileContent(fileSpec, safeSpec)
+            val file = File(projectDir, fileSpec.path).canonicalFile
+            require(file.path.startsWith(projectDir.path + File.separator)) {
+                "Generated file path escaped the project directory"
+            }
             file.parentFile?.mkdirs()
             file.writeText(content)
         }
-        
+
         _state.value = BuildState.Building(0)
-        
+
         if (isGradleAvailable()) {
             buildApk(projectDir)
         } else {
             zipProject(projectDir)
-            _state.value = BuildState.Complete(spec.appName, null)
+            _state.value = BuildState.Complete(safeSpec.appName, null)
         }
     }
     
@@ -161,6 +173,19 @@ class AppBuilderMode(private val context: Context) {
         _state.value = BuildState.Complete(projectDir.name, null)
     }
     
+    private fun sanitizeProjectName(value: String): String {
+        return value.lowercase()
+            .replace(Regex("[^a-z0-9_-]"), "_")
+            .trim('_', '-')
+            .take(48)
+            .ifBlank { "myapp" }
+    }
+
+    private fun sanitizeScreenName(value: String): String {
+        val candidate = value.replace(Regex("[^A-Za-z0-9_]"), "").take(48)
+        return candidate.takeIf { it.firstOrNull()?.isLetter() == true } ?: "Screen"
+    }
+
     private fun parseAppSpec(json: JSONObject): AppSpec {
         return AppSpec(
             appName = json.optString("appName", "MyApp"),
