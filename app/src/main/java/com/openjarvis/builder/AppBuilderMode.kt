@@ -8,6 +8,10 @@ import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
+import java.io.FileInputStream
+import java.io.BufferedInputStream
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
 
 class AppBuilderMode(private val context: Context) {
     
@@ -81,14 +85,9 @@ class AppBuilderMode(private val context: Context) {
             file.writeText(content)
         }
 
-        _state.value = BuildState.Building(0)
-
-        if (isGradleAvailable()) {
-            buildApk(projectDir)
-        } else {
-            zipProject(projectDir)
-            _state.value = BuildState.Complete(safeSpec.appName, null)
-        }
+        _state.value = BuildState.Building(50)
+        val archive = zipProject(projectDir)
+        _state.value = BuildState.Complete(safeSpec.appName, archive.absolutePath)
     }
     
     private fun buildFileList(spec: AppSpec): List<FileSpec> {
@@ -156,21 +155,48 @@ class AppBuilderMode(private val context: Context) {
         }
     }
     
-    private fun isGradleAvailable(): Boolean {
-        return try {
-            Runtime.getRuntime().exec("gradle --version")
-            true
-        } catch (e: Exception) {
-            false
+    private fun zipProject(projectDir: File): File {
+        val canonicalOutput = outputDir.canonicalFile
+        val canonicalProject = projectDir.canonicalFile
+        require(canonicalProject.path.startsWith(canonicalOutput.path + File.separator)) {
+            "Project directory is outside the output folder"
         }
-    }
-    
-    private suspend fun buildApk(projectDir: File) {
-        _state.value = BuildState.Building(0)
-    }
-    
-    private fun zipProject(projectDir: File) {
-        _state.value = BuildState.Complete(projectDir.name, null)
+
+        val archive = File(canonicalOutput, "${projectDir.name}.zip")
+        val temporaryArchive = File(canonicalOutput, "${projectDir.name}.zip.tmp")
+        if (temporaryArchive.exists()) temporaryArchive.delete()
+
+        try {
+            ZipOutputStream(temporaryArchive.outputStream().buffered()).use { zip ->
+                val files = projectDir.walkTopDown().filter { it.isFile }.toList()
+                files.forEachIndexed { index, file ->
+                    val canonicalFile = file.canonicalFile
+                    require(canonicalFile.path.startsWith(canonicalProject.path + File.separator)) {
+                        "Generated file escaped the project directory"
+                    }
+                    val relativePath = canonicalProject.toPath()
+                        .relativize(canonicalFile.toPath()).toString().replace(File.separatorChar, '/')
+                    zip.putNextEntry(ZipEntry("${projectDir.name}/$relativePath"))
+                    BufferedInputStream(FileInputStream(canonicalFile)).use { input ->
+                        input.copyTo(zip)
+                    }
+                    zip.closeEntry()
+                    _state.value = BuildState.Building(
+                        50 + ((index + 1) * 50 / files.size.coerceAtLeast(1))
+                    )
+                }
+            }
+            if (archive.exists() && !archive.delete()) {
+                throw IllegalStateException("Unable to replace previous project archive")
+            }
+            if (!temporaryArchive.renameTo(archive)) {
+                throw IllegalStateException("Unable to finalize project archive")
+            }
+            return archive
+        } catch (error: Exception) {
+            temporaryArchive.delete()
+            throw error
+        }
     }
     
     private fun sanitizeProjectName(value: String): String {
