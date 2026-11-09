@@ -12,7 +12,11 @@ class AIAppInteractor(private val context: Context) {
     
     fun openAIApp(meta: AIAppMeta): Boolean {
         val service = JarvisAccessibilityService.instance ?: return false
-        return try { service.openAppByPackage(meta.packageName); true } catch (e: Exception) { false }
+        return try {
+            service.openAppByPackage(meta.packageName)
+        } catch (e: Exception) {
+            false
+        }
     }
     
     fun clearContext() {
