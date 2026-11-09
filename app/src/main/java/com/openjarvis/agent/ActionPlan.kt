@@ -43,6 +43,7 @@ data class Action(
 sealed class AgentState {
     object Idle : AgentState()
     data class Running(val step: String) : AgentState()
+    data class AwaitingConfirmation(val summary: String) : AgentState()
     data class Done(val result: String) : AgentState()
     data class Error(val message: String) : AgentState()
 }
