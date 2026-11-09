@@ -167,6 +167,10 @@ class VoiceManager(private val context: Context) {
         }
     }
 
+    fun testSpeak(text: String) {
+        ttsEngine.speak(text)
+    }
+
     fun stopSpeaking() {
         ttsEngine.stop()
     }
