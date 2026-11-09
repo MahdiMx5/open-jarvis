@@ -42,12 +42,16 @@ fun SettingsScreen(
     onNavigateBack: () -> Unit,
     onSaveProvider: (String, String, String, String) -> Unit,
     voiceManager: VoiceManager,
+    initialProviderName: String = "Groq",
+    initialBaseUrl: String = "",
+    initialApiKey: String = "",
+    initialModel: String = "llama-3.1-70b-versatile",
     modifier: Modifier = Modifier
 ) {
-    var selectedProvider by remember { mutableStateOf("Groq") }
-    var baseUrl by remember { mutableStateOf("") }
-    var apiKey by remember { mutableStateOf("") }
-    var model by remember { mutableStateOf("llama-3.1-70b-versatile") }
+    var selectedProvider by remember { mutableStateOf(initialProviderName) }
+    var baseUrl by remember { mutableStateOf(initialBaseUrl) }
+    var apiKey by remember { mutableStateOf(initialApiKey) }
+    var model by remember { mutableStateOf(initialModel) }
     var showBaseUrlField by remember { mutableStateOf(false) }
     var showProvidersDropdown by remember { mutableStateOf(false) }
     var showPassword by remember { mutableStateOf(false) }
