@@ -195,8 +195,8 @@ class SocketServer(
         while (true) {
             val value = reader.read()
             if (value == -1) return if (line.isEmpty()) null else line.toString()
-            if (value == '\\n'.code) return line.toString()
-            if (value != '\\r'.code) {
+            if (value == '\n'.code) return line.toString()
+            if (value != '\r'.code) {
                 if (line.length >= MAX_COMMAND_LENGTH) {
                     throw IllegalArgumentException("Request is too long")
                 }
