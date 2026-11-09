@@ -57,22 +57,51 @@ class SelfHealingExecutor(private val context: Context) {
             
             when (action.action) {
                 Action.TAP -> {
-                    val tapped = service?.tapByText(action.text ?: "") == true
-                    if (service == null) ActionResult.Failed("Accessibility service unavailable") else ActionResult.Success(if (tapped) "tapped ${action.text}" else "tap failed")
+                    val text = action.text?.takeIf { it.isNotBlank() }
+                        ?: return ActionResult.Failed("No text provided for tap")
+                    if (service == null) {
+                        ActionResult.Failed("Accessibility service unavailable")
+                    } else if (service.tapByText(text)) {
+                        ActionResult.Success("tapped $text")
+                    } else {
+                        ActionResult.Failed("Could not tap: $text")
+                    }
                 }
                 Action.TYPE -> {
-                    val typed = service?.typeText(action.value ?: "") == true
-                    if (service == null) ActionResult.Failed("Accessibility service unavailable") else ActionResult.Success(if (typed) "typed ${action.value}" else "type failed")
+                    val value = action.value?.takeIf { it.isNotBlank() }
+                        ?: return ActionResult.Failed("No value provided for type")
+                    if (service == null) {
+                        ActionResult.Failed("Accessibility service unavailable")
+                    } else if (service.typeText(value)) {
+                        ActionResult.Success("typed text")
+                    } else {
+                        ActionResult.Failed("Could not type text")
+                    }
                 }
                 Action.OPEN_APP -> {
-                    service?.openAppByPackage(action.packageName ?: "")
-                    ActionResult.Success("opened ${action.packageName}")
+                    val packageName = action.packageName?.takeIf { it.isNotBlank() }
+                        ?: return ActionResult.Failed("No package provided for open_app")
+                    if (service == null) {
+                        ActionResult.Failed("Accessibility service unavailable")
+                    } else if (service.openAppByPackage(packageName)) {
+                        ActionResult.Success("opened $packageName")
+                    } else {
+                        ActionResult.Failed("Could not open app: $packageName")
+                    }
                 }
                 Action.PRESS_BACK -> {
-                    service?.pressBack()
-                    ActionResult.Success("pressed back")
+                    if (service?.pressBack() == true) ActionResult.Success("pressed back")
+                    else ActionResult.Failed("Could not press back")
                 }
-                else -> ActionResult.Success("action ${action.action} executed")
+                Action.PRESS_HOME -> {
+                    if (service?.pressHome() == true) ActionResult.Success("pressed home")
+                    else ActionResult.Failed("Could not press home")
+                }
+                Action.PRESS_RECENTS -> {
+                    if (service?.pressRecents() == true) ActionResult.Success("opened recent apps")
+                    else ActionResult.Failed("Could not open recent apps")
+                }
+                else -> ActionResult.Failed("Unsupported action: ${action.action}")
             }
         } catch (e: Exception) {
             ActionResult.Failed(e.message ?: "Unknown error")
