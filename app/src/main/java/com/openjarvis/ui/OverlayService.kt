@@ -12,6 +12,8 @@ import android.util.Log
 import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
+import android.view.MotionEvent
+import android.widget.Toast
 import android.view.WindowManager
 import android.graphics.PixelFormat
 import android.widget.EditText
@@ -22,6 +24,7 @@ import com.openjarvis.agent.AgentCore
 import com.openjarvis.bridge.SocketServer
 import com.openjarvis.graphify.GraphifyRepository
 import com.openjarvis.graphify.nodes.TaskNode
+import com.openjarvis.voice.STTMode
 import com.openjarvis.voice.VoiceManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -44,6 +47,7 @@ class OverlayService : Service() {
     private lateinit var graphifyRepo: GraphifyRepository
     private lateinit var socketServer: SocketServer
     private var stateCollectJob: Job? = null
+    private var voiceCollectJob: Job? = null
     private var recentTasks = emptyList<TaskNode>()
 
     private var isInitialized = false
@@ -100,6 +104,24 @@ class OverlayService : Service() {
             }
         }
 
+        voiceCollectJob = serviceScope.launch {
+            voiceManager.state.collect { voiceState ->
+                val input = overlayView?.findViewById<EditText>(R.id.command_input)
+                val status = overlayView?.findViewById<TextView>(R.id.status_text)
+                when (voiceState) {
+                    is VoiceManager.VoiceState.Recording -> status?.text = "Listening..."
+                    is VoiceManager.VoiceState.Transcribing -> status?.text = "Transcribing..."
+                    is VoiceManager.VoiceState.Result -> {
+                        input?.setText(voiceState.text)
+                        input?.setSelection(input.text.length)
+                        status?.text = "Voice text ready"
+                    }
+                    is VoiceManager.VoiceState.Error -> status?.text = voiceState.message
+                    VoiceManager.VoiceState.Idle -> Unit
+                }
+            }
+        }
+
         CoroutineScope(Dispatchers.IO).launch {
             runCatching {
                 recentTasks = graphifyRepo.getRecentTasks(10)
@@ -136,6 +158,7 @@ class OverlayService : Service() {
 
     override fun onDestroy() {
         stateCollectJob?.cancel()
+        voiceCollectJob?.cancel()
         serviceScope.cancel()
         removeOverlayView()
         if (::socketServer.isInitialized) socketServer.stop()
@@ -195,6 +218,28 @@ class OverlayService : Service() {
         }
         view.findViewById<View>(R.id.cancel_action_button).setOnClickListener {
             agentCore.respondToPendingConfirmation(false)
+        }
+
+        view.findViewById<View>(R.id.voice_button).setOnTouchListener { _, event ->
+            when (event.action) {
+                MotionEvent.ACTION_DOWN -> {
+                    if (!voiceManager.isVoiceEnabled()) {
+                        Toast.makeText(this, "Enable Voice Assistant in Settings first", Toast.LENGTH_SHORT).show()
+                    } else if (voiceManager.getSTTMode() == STTMode.AUTO_VAD) {
+                        voiceManager.startListeningWithVAD()
+                    } else {
+                        voiceManager.startListening()
+                    }
+                    true
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    if (voiceManager.getSTTMode() == STTMode.PUSH_TO_TALK) {
+                        voiceManager.stopListening()
+                    }
+                    true
+                }
+                else -> true
+            }
         }
 
         view.findViewById<View>(R.id.send_button).setOnClickListener {
