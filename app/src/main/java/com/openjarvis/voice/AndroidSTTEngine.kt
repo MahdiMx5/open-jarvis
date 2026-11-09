@@ -36,7 +36,8 @@ class AndroidSTTEngine(private val context: Context) : STTEngine {
     @Volatile private var recognitionLanguage: String = Locale.getDefault().toLanguageTag()
 
     fun setRecognitionLanguage(languageTag: String) {
-        recognitionLanguage = if (languageTag == "en-US") "en-US" else "fa-IR"
+        val supported = setOf("fa-IR", "en-US", "en-AU", "es-ES", "de-DE")
+        recognitionLanguage = languageTag.takeIf { it in supported } ?: "fa-IR"
     }
 
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
