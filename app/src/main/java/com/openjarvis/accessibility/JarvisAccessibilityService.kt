@@ -95,6 +95,15 @@ class JarvisAccessibilityService : AccessibilityService() {
         return false
     }
 
+    fun getActivePackageName(): String? {
+        val root = rootInActiveWindow ?: return null
+        return try {
+            root.packageName?.toString()
+        } finally {
+            root.recycle()
+        }
+    }
+
     fun pressBack() = performGlobalAction(GLOBAL_ACTION_BACK)
     fun pressHome() = performGlobalAction(GLOBAL_ACTION_HOME)
     fun pressRecents() = performGlobalAction(GLOBAL_ACTION_RECENTS)
