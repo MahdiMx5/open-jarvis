@@ -48,6 +48,11 @@ class SettingsActivity : ComponentActivity() {
                         saveProviderSettings(name, baseUrl, apiKey, model)
                     },
                     voiceManager = voiceManager,
+                    initialProviderName = prefs.getString("provider_name", "Groq") ?: "Groq",
+                    initialBaseUrl = prefs.getString("provider_base_url", "") ?: "",
+                    initialApiKey = prefs.getString("provider_api_key", "") ?: "",
+                    initialModel = prefs.getString("provider_model", "llama-3.1-70b-versatile")
+                        ?: "llama-3.1-70b-versatile",
                     modifier = Modifier.fillMaxSize()
                 )
             }
