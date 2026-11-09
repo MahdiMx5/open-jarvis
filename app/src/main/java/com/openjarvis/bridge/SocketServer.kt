@@ -170,6 +170,10 @@ class SocketServer(
                         writer.println("""{"requestId":"${escapeJson(requestId)}","status":"progress","result":"${escapeJson(state.step)}"}""")
                         writer.flush()
                     }
+                    is AgentState.AwaitingConfirmation -> {
+                        writer.println("""{"requestId":"${escapeJson(requestId)}","status":"confirmation_required","result":"User approval is required in the Open Jarvis overlay"}""")
+                        writer.flush()
+                    }
                     is AgentState.Done -> {
                         writer.println("""{"requestId":"${escapeJson(requestId)}","status":"done","result":"${escapeJson(state.result)}"}""")
                         writer.flush()
