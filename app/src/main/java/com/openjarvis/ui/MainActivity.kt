@@ -15,6 +15,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
@@ -99,11 +102,11 @@ class MainActivity : ComponentActivity() {
 
         try {
             OverlayService.start(this)
-            Toast.makeText(this, "Jarvis is starting", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "جارویس داره شروع می‌شه", Toast.LENGTH_SHORT).show()
         } catch (error: Exception) {
             Toast.makeText(
                 this,
-                "Could not start Jarvis: ${error.message ?: "unknown error"}",
+                "جارویس شروع نشد: ${error.message ?: "خطای ناشناخته"}",
                 Toast.LENGTH_LONG
             ).show()
         }
@@ -129,6 +132,7 @@ fun PermissionScreen(
     val onSurfaceColor = com.openjarvis.ui.theme.VoidColor.TextPrimary
     val onSurfaceVariantColor = com.openjarvis.ui.theme.VoidColor.TextSecondary
 
+    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
     androidx.compose.foundation.layout.Column(
         modifier = Modifier
             .fillMaxSize()
@@ -137,7 +141,7 @@ fun PermissionScreen(
         verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center
     ) {
         androidx.compose.material3.Text(
-            text = "Permission Required",
+            text = "اجازه دسترسی لازمه",
             style = androidx.compose.material3.MaterialTheme.typography.headlineMedium,
             color = onSurfaceColor
         )
@@ -145,7 +149,7 @@ fun PermissionScreen(
         androidx.compose.foundation.layout.Spacer(modifier = Modifier.height(16.dp))
 
         androidx.compose.material3.Text(
-            text = "Open Jarvis needs accessibility and overlay permissions to control your device.",
+            text = "برای اینکه جارویس بتونه با اجازهٔ خودت با برنامه‌ها کار کنه، این دسترسی‌ها لازمه.",
             style = androidx.compose.material3.MaterialTheme.typography.bodyMedium,
             color = onSurfaceVariantColor,
             textAlign = androidx.compose.ui.text.style.TextAlign.Center
@@ -158,7 +162,7 @@ fun PermissionScreen(
                 onClick = onEnableAccessibility,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                androidx.compose.material3.Text("Enable Accessibility Service")
+                androidx.compose.material3.Text("فعال‌کردن دسترسی‌پذیری")
             }
 
             androidx.compose.foundation.layout.Spacer(modifier = Modifier.height(16.dp))
@@ -169,16 +173,17 @@ fun PermissionScreen(
                 onClick = onEnableOverlay,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                androidx.compose.material3.Text("Enable Overlay Permission")
+                androidx.compose.material3.Text("اجازه نمایش روی برنامه‌ها")
             }
         }
 
         if (accessibilityEnabled && overlayEnabled) {
             androidx.compose.material3.Text(
-                text = "Jarvis is active",
+                text = "جارویس فعاله",
                 style = androidx.compose.material3.MaterialTheme.typography.titleMedium,
                 color = primaryColor
             )
         }
+    }
     }
 }
