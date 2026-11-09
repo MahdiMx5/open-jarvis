@@ -38,7 +38,8 @@ class SettingsActivity : ComponentActivity() {
             EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
             EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
         )
-        
+        voiceManager = VoiceManager(applicationContext)
+
         setContent {
             OpenJarvisTheme {
                 SettingsScreen(
