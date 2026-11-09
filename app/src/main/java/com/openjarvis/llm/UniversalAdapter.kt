@@ -27,18 +27,18 @@ class UniversalAdapter(private val context: Context) {
         val model = prefs.getString("provider_model", "")
         
         return when (name) {
-            "Groq" -> GroqProvider(apiKey, model)
-            "Google Gemini", "gemini" -> GeminiProvider(apiKey, model)
-            "OpenRouter" -> OpenRouterProvider(apiKey, model)
-            "Anthropic Claude" -> AnthropicProvider(apiKey, model)
-            "OpenAI" -> OpenAIProvider(apiKey, model)
-            "Ollama (Local)" -> OllamaProvider(baseUrl, model)
+            "Groq" -> GroqProvider(apiKey ?: "", model ?: "")
+            "Google Gemini", "gemini" -> GeminiProvider(apiKey ?: "", model ?: "")
+            "OpenRouter" -> OpenRouterProvider(apiKey ?: "", model ?: "")
+            "Anthropic Claude" -> AnthropicProvider(apiKey ?: "", model ?: "")
+            "OpenAI" -> OpenAIProvider(apiKey ?: "", model ?: "")
+            "Ollama (Local)" -> OllamaProvider(baseUrl ?: "", model ?: "")
             "Local (LlamaCpp)" -> {
                 val mm = getModelManager(context)
                 val tier = mm.getDownloadedTier() ?: ModelManager.ModelTier.MINIMUM
                 LlamaProvider(mm.getModelPath(tier), tier.displayName)
             }
-            "Custom" -> CustomProvider(baseUrl, apiKey, model)
+            "Custom" -> CustomProvider(baseUrl ?: "", apiKey ?: "", model ?: "")
             else -> CustomProvider(baseUrl, apiKey, model)
         }
     }
@@ -82,7 +82,7 @@ class UniversalAdapter(private val context: Context) {
         }
         
         fun isLocalModelLoaded(): Boolean {
-            return modelManager?.state?.value is ModelManager.ModelState.ModelLoaded
+            return modelManager?.state?.value is ModelManager.ModelState.Loaded
         }
         
         suspend fun loadLocalModel(tier: ModelManager.ModelTier): Result<Unit> {
