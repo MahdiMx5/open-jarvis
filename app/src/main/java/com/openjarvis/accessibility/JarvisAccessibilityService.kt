@@ -100,31 +100,33 @@ class JarvisAccessibilityService : AccessibilityService() {
     fun pressRecents() = performGlobalAction(GLOBAL_ACTION_RECENTS)
 
     private fun findNodeByText(root: AccessibilityNodeInfo, text: String): AccessibilityNodeInfo? {
-        val normalizedText = text.lowercase()
-        
+        val normalizedText = text.trim().lowercase()
+        if (normalizedText.isEmpty()) return null
+
         val queue = ArrayDeque<AccessibilityNodeInfo>()
         queue.add(root)
-        
+
         while (queue.isNotEmpty()) {
             val node = queue.removeFirst()
-            
             val nodeText = node.text?.toString()?.lowercase()
             val contentDesc = node.contentDescription?.toString()?.lowercase()
-            
-            if (nodeText?.contains(normalizedText) == true || contentDesc?.contains(normalizedText) == true) {
-                if (node.isClickable && node.isVisibleToUser) {
-                    return node
-                }
+
+            if ((nodeText?.contains(normalizedText) == true ||
+                    contentDesc?.contains(normalizedText) == true) &&
+                node.isClickable && node.isVisibleToUser
+            ) {
+                val result = AccessibilityNodeInfo.obtain(node)
+                if (node !== root) node.recycle()
+                while (queue.isNotEmpty()) queue.removeFirst().recycle()
+                return result
             }
-            
+
             for (i in 0 until node.childCount) {
-                node.getChild(i)?.let { child ->
-                    queue.add(child)
-                }
+                node.getChild(i)?.let(queue::add)
             }
-            node.recycle()
+            if (node !== root) node.recycle()
         }
-        
+
         return null
     }
 
