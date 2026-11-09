@@ -41,11 +41,11 @@ class ActionExecutor(private val service: JarvisAccessibilityService) {
                 val label = action.label
                 
                 if (packageName != null) {
-                    service.openAppByPackage(packageName)
-                    ActionResult(action, true, null)
+                    val success = service.openAppByPackage(packageName)
+                    ActionResult(action, success, if (!success) "Could not open app: $packageName" else null)
                 } else if (label != null) {
                     val success = service.openAppByLabel(label)
-                    ActionResult(action, success, if (!success) "App not found: $label" else null)
+                    ActionResult(action, success, if (!success) "App not found or could not be opened: $label" else null)
                 } else {
                     ActionResult(action, false, "No package or label provided")
                 }
@@ -72,18 +72,18 @@ class ActionExecutor(private val service: JarvisAccessibilityService) {
             }
             
             Action.PRESS_BACK -> {
-                service.pressBack()
-                ActionResult(action, true, null)
+                val success = service.pressBack()
+                ActionResult(action, success, if (!success) "Could not press back" else null)
             }
             
             Action.PRESS_HOME -> {
-                service.pressHome()
-                ActionResult(action, true, null)
+                val success = service.pressHome()
+                ActionResult(action, success, if (!success) "Could not press home" else null)
             }
             
             Action.PRESS_RECENTS -> {
-                service.pressRecents()
-                ActionResult(action, true, null)
+                val success = service.pressRecents()
+                ActionResult(action, success, if (!success) "Could not open recent apps" else null)
             }
             
             else -> {
