@@ -30,6 +30,7 @@ class AgentCore(private val context: Context) {
     private val graphifyRepo = GraphifyRepository(context)
     private val analysisEngine = AnalysisEngine(context)
     private val universalAdapter = UniversalAdapter(context)
+    private val providerFallbackChain = ProviderFallbackChain(context)
     private val screenReader = ScreenReader(context)
     private val visionModule = VisionModule.getInstance(context)
     private val taskRouter = TaskRouter(context)
@@ -137,7 +138,7 @@ RULES:
 
                     if (isConversationalCommand(safeCommand)) {
                         _state.value = AgentState.Running("دارم جوابت رو آماده می‌کنم...")
-                        val chatResult = universalAdapter.complete(chatSystemPrompt, safeCommand)
+                        val chatResult = providerFallbackChain.completeWithFallback(chatSystemPrompt, safeCommand)
                         chatResult.fold(
                             onSuccess = { answer ->
                                 val cleanAnswer = answer.trim().take(4000)
@@ -205,7 +206,7 @@ RULES:
 
                     val startTime = System.currentTimeMillis()
 
-                    val result = universalAdapter.complete(
+                    val result = providerFallbackChain.completeWithFallback(
                         fullSystem,
                         safeCommand
                     )
