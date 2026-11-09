@@ -55,6 +55,7 @@ class VoiceManager(private val context: Context) {
         // Apply saved settings
         ttsEngine.setSpeechRate(getSpeechRate())
         sttEngine.setRecognitionLanguage(getRecognitionLanguage())
+        ttsEngine.setPreferredLanguage(getRecognitionLanguage())
     }
 
     fun initialize() { ttsEngine.setSpeechRate(getSpeechRate()) }
@@ -89,9 +90,11 @@ class VoiceManager(private val context: Context) {
     fun getRecognitionLanguage(): String = prefs.getString(KEY_RECOGNITION_LANGUAGE, "fa-IR") ?: "fa-IR"
 
     fun setRecognitionLanguage(languageTag: String) {
-        val safeLanguage = if (languageTag == "en-US") "en-US" else "fa-IR"
+        val supported = setOf("fa-IR", "en-US", "en-AU", "es-ES", "de-DE")
+        val safeLanguage = languageTag.takeIf { it in supported } ?: "fa-IR"
         prefs.edit().putString(KEY_RECOGNITION_LANGUAGE, safeLanguage).apply()
         sttEngine.setRecognitionLanguage(safeLanguage)
+        ttsEngine.setPreferredLanguage(safeLanguage)
     }
 
     fun setSpeechRate(rate: Float) {
