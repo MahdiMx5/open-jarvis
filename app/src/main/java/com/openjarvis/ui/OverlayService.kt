@@ -88,8 +88,14 @@ class OverlayService : Service() {
                     is com.openjarvis.agent.AgentState.Idle -> "Ready"
                     is com.openjarvis.agent.AgentState.Running -> state.step
                     is com.openjarvis.agent.AgentState.AwaitingConfirmation -> "Confirmation required"
-                    is com.openjarvis.agent.AgentState.Done -> state.result
-                    is com.openjarvis.agent.AgentState.Error -> state.message
+                    is com.openjarvis.agent.AgentState.Done -> {
+                        voiceManager.speak("انجام شد")
+                        state.result
+                    }
+                    is com.openjarvis.agent.AgentState.Error -> {
+                        voiceManager.speak("یه مشکلی پیش اومد")
+                        state.message
+                    }
                 }
 
                 val confirmationText = overlayView?.findViewById<TextView>(R.id.confirmation_text)
