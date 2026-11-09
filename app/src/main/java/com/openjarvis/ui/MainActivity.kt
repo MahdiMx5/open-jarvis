@@ -81,8 +81,16 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun startOverlayService() {
-        OverlayService.start(this)
-        Toast.makeText(this, "Jarvis is active", Toast.LENGTH_SHORT).show()
+        try {
+            OverlayService.start(this)
+            Toast.makeText(this, "Jarvis is starting", Toast.LENGTH_SHORT).show()
+        } catch (error: Exception) {
+            Toast.makeText(
+                this,
+                "Could not start Jarvis: ${error.message ?: "unknown error"}",
+                Toast.LENGTH_LONG
+            ).show()
+        }
     }
 
     private fun openSettings() {
