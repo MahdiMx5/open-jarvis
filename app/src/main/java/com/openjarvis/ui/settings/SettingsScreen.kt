@@ -257,6 +257,16 @@ fun SettingsScreen(
                         valueRange = 0.5f..2.0f
                     )
 
+                    Button(
+                        onClick = { voiceManager.testSpeak("سلام! من جارویسم. چطوری؟") },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = VoidColor.VioletDim)
+                    ) {
+                        Text("تست صدای فارسی")
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+
                     Surface(
                         modifier = Modifier.fillMaxWidth().clickable {
                             recognitionLanguage = if (recognitionLanguage == "fa-IR") "en-US" else "fa-IR"
