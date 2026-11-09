@@ -14,6 +14,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -52,6 +53,7 @@ class OnboardingActivity : ComponentActivity() {
 fun OnboardingScreen(onComplete: () -> Unit) {
     var currentScreen by remember { mutableIntStateOf(0) }
     val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
     
     Scaffold(
         containerColor = VoidColor.Void950
@@ -360,7 +362,7 @@ private fun TryItScreen(onBack: () -> Unit, onSuccess: () -> Unit) {
         Button(
             onClick = {
                 isRunning = true
-                lifecycleScope.launch {
+                coroutineScope.launch {
                     delay(2000)
                     isRunning = false
                     onSuccess()
