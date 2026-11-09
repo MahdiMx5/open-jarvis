@@ -10,20 +10,14 @@ class AndroidTTSEngine(private val context: Context) {
 
     private var tts: TextToSpeech? = null
     private var isReady = false
-    private var speechRate = 1.05f
-    private var pitch = 0.95f
+    private var speechRate = 0.96f
+    private var pitch = 1.0f
 
     init {
         tts = TextToSpeech(context) { status ->
             if (status == TextToSpeech.SUCCESS) {
                 isReady = true
-                val preferredLocale = Locale.getDefault()
-                val languageResult = tts?.setLanguage(preferredLocale)
-                if (languageResult == TextToSpeech.LANG_MISSING_DATA ||
-                    languageResult == TextToSpeech.LANG_NOT_SUPPORTED
-                ) {
-                    tts?.setLanguage(Locale.US)
-                }
+                tts?.setLanguage(Locale.US)
                 tts?.setSpeechRate(speechRate)
                 tts?.setPitch(pitch)
                 
@@ -46,6 +40,7 @@ class AndroidTTSEngine(private val context: Context) {
         
         if (clean.isBlank()) return
         
+        selectLanguageFor(clean)
         val utteranceId = "jarvis_${UUID.randomUUID()}"
         tts?.speak(clean, TextToSpeech.QUEUE_FLUSH, null, utteranceId)
     }
@@ -60,8 +55,22 @@ class AndroidTTSEngine(private val context: Context) {
         
         if (clean.isBlank()) return
         
+        selectLanguageFor(clean)
         val utteranceId = "jarvis_${UUID.randomUUID()}"
         tts?.speak(clean, TextToSpeech.QUEUE_ADD, null, utteranceId)
+    }
+
+    private fun selectLanguageFor(text: String) {
+        val hasPersian = text.any { it in '\u0600'..'\u06FF' }
+        val locale = if (hasPersian) Locale("fa", "IR") else Locale.US
+        val result = tts?.isLanguageAvailable(locale) ?: TextToSpeech.LANG_NOT_SUPPORTED
+        if (result >= TextToSpeech.LANG_AVAILABLE) {
+            tts?.language = locale
+        } else {
+            // Keep the engine's currently configured language; do not silently
+            // claim that a Persian voice is installed when the device lacks one.
+            tts?.language = Locale.getDefault()
+        }
     }
 
     fun stop() {
