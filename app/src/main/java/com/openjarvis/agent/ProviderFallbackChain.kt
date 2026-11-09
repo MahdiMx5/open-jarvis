@@ -5,98 +5,98 @@ import com.openjarvis.graphify.GraphifyRepository
 import com.openjarvis.llm.LLMProvider
 import com.openjarvis.llm.UniversalAdapter
 import kotlinx.coroutines.flow.MutableStateFlow
-import org.json.JSONException
+import kotlinx.coroutines.flow.StateFlow
 
 class ProviderFallbackChain(private val context: Context) {
-    
+
     private val graphifyRepo = GraphifyRepository(context)
     private val cooldownMap = mutableMapOf<String, Long>()
     private val _notification = MutableStateFlow<String?>(null)
-    
     private val prefs = context.getSharedPreferences("jarvis_prefs", Context.MODE_PRIVATE)
-    
+
     private val fallbackOrder: List<String>
-        get() = prefs.getString("fallback_order", "Groq,Google Gemini,OpenRouter,Anthropic Claude,OpenAI")
-            ?.split(",") ?: emptyList()
-    
+        get() = prefs.getString(
+            "fallback_order",
+            "Groq,Google Gemini,OpenRouter,Anthropic Claude,OpenAI"
+        )?.split(",")?.map(String::trim)?.filter(String::isNotBlank) ?: emptyList()
+
     suspend fun completeWithFallback(system: String, user: String): Result<String> {
-        val providers = fallbackOrder.mapNotNull { name ->
-            try {
-                val adapter = UniversalAdapter(context)
-                val provider = getProvider(name, adapter)
-                provider to name
-            } catch (e: Exception) {
-                null
-            }
+        val adapter = UniversalAdapter(context)
+        val activeName = adapter.getProviderName()
+        val orderedNames = (listOf(activeName) + fallbackOrder).distinct()
+        val providers = orderedNames.mapNotNull { name ->
+            if (!adapter.isProviderConfigured(name) || isInCooldown(name)) return@mapNotNull null
+            adapter.getProviderForName(name)?.let { provider -> provider to name }
         }
-        
+
+        if (providers.isEmpty()) {
+            return Result.failure(IllegalStateException("No configured AI provider. Add an API key in Settings."))
+        }
+
+        var lastError: Throwable? = null
         for ((provider, name) in providers) {
-            if (isInCooldown(name)) continue
-            
-            val result = try { provider.complete(system, user) } catch (e: Exception) { Result.failure(e) }
-            
+            val result = runCatching { provider.complete(system, user) }.getOrElse {
+                Result.failure(it)
+            }
             if (result.isSuccess) {
+                _notification.value = null
                 return result
             }
-            
-            val errorMsg = result.exceptionOrNull()?.message ?: ""
-            
-            graphifyRepo.logTask("provider:$name", "failed: $errorMsg", name, 0)
-            
-            if (errorMsg.contains("429")) {
-                cooldownMap[name] = System.currentTimeMillis() + 60_000
-                _notification.value = "Rate limited by $name, trying next provider..."
+
+            val error = result.exceptionOrNull() ?: IllegalStateException("Unknown provider error")
+            lastError = error
+            runCatching {
+                graphifyRepo.logTask("provider:$name", "failed: ${error.message.orEmpty()}", name, 0L)
             }
-            
-            if (errorMsg.contains("401")) {
-                cooldownMap[name] = System.currentTimeMillis() + 3600_000
+
+            val message = error.message.orEmpty()
+            when {
+                message.contains("429") -> {
+                    cooldownMap[name] = System.currentTimeMillis() + 60_000L
+                    _notification.value = "سرویس $name محدودیت درخواست دارد؛ دارم سرویس بعدی را امتحان می‌کنم."
+                }
+                message.contains("401") || message.contains("403") -> {
+                    cooldownMap[name] = System.currentTimeMillis() + 3_600_000L
+                    _notification.value = "کلید دسترسی $name مشکل دارد؛ دارم سرویس بعدی را امتحان می‌کنم."
+                }
             }
         }
-        
-        return Result.failure(Exception("All providers failed or rate limited"))
+
+        return Result.failure(
+            IllegalStateException("همه سرویس‌های تنظیم‌شده ناموفق بودند.", lastError)
+        )
     }
-    
-    private fun getProvider(name: String, adapter: UniversalAdapter): LLMProvider {
-        return adapter.getActiveProvider()
-    }
-    
+
     private fun isInCooldown(name: String): Boolean {
-        val cooldownUntil = cooldownMap[name] ?: return false
-        return System.currentTimeMillis() < cooldownUntil
+        val until = cooldownMap[name] ?: return false
+        if (System.currentTimeMillis() >= until) {
+            cooldownMap.remove(name)
+            return false
+        }
+        return true
     }
-    
-    fun getNotification() = _notification
+
+    fun getNotification(): StateFlow<String?> = _notification
 }
 
 object JarvisErrorTranslator {
-    
+
     fun translate(error: Throwable, providerName: String?): String {
+        val message = error.message.orEmpty()
         return when {
-            error.message?.contains("401") == true ->
-                "API key rejected by ${providerName ?: "provider"}. Check your key in Settings."
-            
-            error.message?.contains("429") == true ->
-                "Rate limited by ${providerName ?: "provider"}. Trying next provider..."
-            
-            error.message?.contains("503") == true ->
-                "${providerName ?: "Provider"} is down. Try a different provider in Settings."
-            
-            error.message?.contains("timeout") == true ->
-                "Request timed out after 30s. Your internet may be slow."
-            
-            error.message?.contains("Unable to resolve host") == true ->
-                "No internet connection. Switch to Local Model in Settings for offline use."
-            
-            error is JSONException ->
-                "AI returned unexpected response. Retrying with stricter instructions..."
-            
+            message.contains("401") || message.contains("403") ->
+                "کلید دسترسی ${providerName ?: "سرویس"} معتبر نیست؛ تنظیماتش رو بررسی کن."
+            message.contains("429") ->
+                "تعداد درخواست‌ها زیاد شده؛ کمی بعد دوباره امتحان کن."
+            message.contains("503") ->
+                "سرویس هوش مصنوعی فعلاً در دسترس نیست."
+            message.contains("timeout", ignoreCase = true) ->
+                "اتصال زمان زیادی برد؛ اینترنت رو بررسی کن."
+            message.contains("Unable to resolve host", ignoreCase = true) ->
+                "اینترنت در دسترس نیست."
             error.message?.contains("SecurityException") == true ->
-                "Permission denied. Check that Accessibility Service is still enabled."
-            
-            error.message?.contains("NullPointerException") == true ->
-                "Screen changed unexpectedly. Trying to recover..."
-            
-            else -> "Something went wrong: ${error.message?.take(100) ?: "Unknown error"}"
+                "اجازهٔ لازم داده نشده؛ دسترسی‌پذیری رو بررسی کن."
+            else -> "یه مشکلی پیش اومد: ${message.take(100).ifBlank { "خطای ناشناخته" }}"
         }
     }
 }
