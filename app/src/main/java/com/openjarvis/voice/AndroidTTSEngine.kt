@@ -12,6 +12,7 @@ class AndroidTTSEngine(private val context: Context) {
     private var isReady = false
     private var speechRate = 0.96f
     private var pitch = 1.0f
+    @Volatile private var preferredLanguageTag = "fa-IR"
 
     init {
         tts = TextToSpeech(context) { status ->
@@ -60,9 +61,14 @@ class AndroidTTSEngine(private val context: Context) {
         tts?.speak(clean, TextToSpeech.QUEUE_ADD, null, utteranceId)
     }
 
+    fun setPreferredLanguage(languageTag: String) {
+        val supported = setOf("fa-IR", "en-US", "en-AU", "es-ES", "de-DE")
+        preferredLanguageTag = languageTag.takeIf { it in supported } ?: "fa-IR"
+    }
+
     private fun selectLanguageFor(text: String) {
         val hasPersian = text.any { it in '\u0600'..'\u06FF' }
-        val locale = if (hasPersian) Locale("fa", "IR") else Locale.US
+        val locale = if (hasPersian) Locale.forLanguageTag("fa-IR") else Locale.forLanguageTag(preferredLanguageTag)
         val result = tts?.isLanguageAvailable(locale) ?: TextToSpeech.LANG_NOT_SUPPORTED
         if (result >= TextToSpeech.LANG_AVAILABLE) {
             tts?.language = locale
