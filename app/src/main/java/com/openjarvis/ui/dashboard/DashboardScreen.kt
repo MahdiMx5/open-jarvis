@@ -1,5 +1,6 @@
 package com.openjarvis.ui.dashboard
 
+import android.util.Log
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
@@ -56,9 +57,15 @@ fun DashboardScreen(
     var tasksAlpha by remember { mutableFloatStateOf(0f) }
     var appsAlpha by remember { mutableFloatStateOf(0f) }
     
-    LaunchedEffect(Unit) {
-        recentTasks = graphifyRepo.getRecentTasks(10)
-        mostUsedApps = graphifyRepo.getMostUsedApps(4)
+    LaunchedEffect(graphifyRepo) {
+        try {
+            recentTasks = graphifyRepo.getRecentTasks(10)
+            mostUsedApps = graphifyRepo.getMostUsedApps(4)
+        } catch (error: Exception) {
+            Log.e("OpenJarvisDashboard", "Unable to load dashboard data", error)
+            recentTasks = emptyList()
+            mostUsedApps = emptyList()
+        }
     }
     
     LaunchedEffect(Unit) {
