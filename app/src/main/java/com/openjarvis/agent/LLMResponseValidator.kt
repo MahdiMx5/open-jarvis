@@ -7,12 +7,18 @@ import org.json.JSONObject
 object LLMResponseValidator {
     
     private val knownActions = setOf(
-        "open_app", "tap", "tap_coords", "long_press", "type",
-        "clear_type", "swipe", "scroll", "press_back", "press_home",
-        "press_recents", "wait_for", "screenshot", "read_screen",
-        "ai_prompt", "mcp_call", "reply_notification",
-        "read_clipboard", "write_clipboard", "highlight_element", "error"
+        Action.OPEN_APP,
+        Action.TAP,
+        Action.TYPE,
+        Action.PRESS_BACK,
+        Action.PRESS_HOME,
+        Action.PRESS_RECENTS,
+        Action.AI_PROMPT,
+        Action.EXTRACT_TEXT,
+        Action.ERROR
     )
+
+    private const val MAX_ACTIONS = 8
     
     fun validate(rawResponse: String): ValidationResult {
         val errors = mutableListOf<String>()
@@ -40,8 +46,13 @@ object LLMResponseValidator {
             return ValidationResult(false, emptyList(), errors, false)
         }
         
+        if (parsed.length() == 0 || parsed.length() > MAX_ACTIONS) {
+            errors.add("Action plan must contain between 1 and $MAX_ACTIONS actions")
+            return ValidationResult(false, emptyList(), errors, false)
+        }
+
         val actions = mutableListOf<Action>()
-        
+
         for (i in 0 until parsed.length()) {
             val obj = try {
                 parsed.getJSONObject(i)
@@ -57,23 +68,31 @@ object LLMResponseValidator {
             }
             
             if (actionType !in knownActions) {
-                errors.add("Unknown action type: $actionType — skipping")
+                errors.add("Unsupported action type: $actionType")
                 continue
             }
-            
-            actions.add(parseAction(obj))
+
+            val action = parseAction(obj)
+            val missingField = when (action.action) {
+                Action.OPEN_APP -> action.packageName.isNullOrBlank() && action.label.isNullOrBlank()
+                Action.TAP -> action.text.isNullOrBlank()
+                Action.TYPE -> action.value.isNullOrBlank()
+                Action.AI_PROMPT -> action.packageName.isNullOrBlank() || action.prompt.isNullOrBlank()
+                else -> false
+            }
+            if (missingField) {
+                errors.add("Action $i is missing a required field")
+                continue
+            }
+
+            actions.add(action)
         }
-        
-        if (actions.size > 50) {
-            errors.add("Suspiciously long action plan (${actions.size} steps) — capped at 50")
-            return ValidationResult(true, actions.take(50), errors, true)
-        }
-        
+
         return ValidationResult(
-            isValid = actions.isNotEmpty(),
+            isValid = errors.isEmpty() && actions.isNotEmpty(),
             actions = actions,
             errors = errors,
-            wasRepaired = errors.isNotEmpty() && actions.isNotEmpty()
+            wasRepaired = false
         )
     }
     
