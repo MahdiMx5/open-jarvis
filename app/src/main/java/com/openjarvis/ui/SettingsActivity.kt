@@ -13,11 +13,13 @@ import androidx.security.crypto.MasterKey
 import com.openjarvis.R
 import com.openjarvis.ui.settings.SettingsScreen
 import com.openjarvis.ui.theme.OpenJarvisTheme
+import com.openjarvis.voice.VoiceManager
 
 class SettingsActivity : ComponentActivity() {
     
     private lateinit var masterKey: MasterKey
     private lateinit var prefs: android.content.SharedPreferences
+    private lateinit var voiceManager: VoiceManager
     
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -44,12 +46,18 @@ class SettingsActivity : ComponentActivity() {
                     onSaveProvider = { name, baseUrl, apiKey, model ->
                         saveProviderSettings(name, baseUrl, apiKey, model)
                     },
+                    voiceManager = voiceManager,
                     modifier = Modifier.fillMaxSize()
                 )
             }
         }
     }
     
+    override fun onDestroy() {
+        if (::voiceManager.isInitialized) voiceManager.release()
+        super.onDestroy()
+    }
+
     private fun saveProviderSettings(name: String, baseUrl: String, apiKey: String, model: String) {
         prefs.edit().apply {
             putString("provider_name", name)
