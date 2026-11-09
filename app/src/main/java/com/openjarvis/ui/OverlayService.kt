@@ -9,22 +9,12 @@ import android.content.Context
 import android.content.Intent
 import android.os.IBinder
 import android.util.Log
-import android.view.Gravity
-import android.view.LayoutInflater
-import android.view.View
-import android.view.MotionEvent
-import android.widget.Toast
-import android.view.WindowManager
-import android.graphics.PixelFormat
-import android.widget.EditText
-import android.widget.TextView
 import androidx.core.app.NotificationCompat
 import com.openjarvis.R
 import com.openjarvis.agent.AgentCore
 import com.openjarvis.bridge.SocketServer
 import com.openjarvis.graphify.GraphifyRepository
 import com.openjarvis.graphify.nodes.TaskNode
-import com.openjarvis.voice.STTMode
 import com.openjarvis.voice.VoiceManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -35,11 +25,10 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.collect
+import java.util.Locale
 
 class OverlayService : Service() {
 
-    private var windowManager: WindowManager? = null
-    private var overlayView: View? = null
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
     private lateinit var agentCore: AgentCore
@@ -49,6 +38,9 @@ class OverlayService : Service() {
     private var stateCollectJob: Job? = null
     private var voiceCollectJob: Job? = null
     private var recentTasks = emptyList<TaskNode>()
+    private var wakeRestartJob: Job? = null
+    private var waitingForCommand = false
+    private var processingCommand = false
 
     private var isInitialized = false
 
@@ -56,7 +48,7 @@ class OverlayService : Service() {
         super.onCreate()
 
         // Promote the service before doing database, crypto, or AI initialization.
-        startForeground(NOTIFICATION_ID, createNotification())
+        startForeground(NOTIFICATION_ID, createNotification(), android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE)
 
         try {
             graphifyRepo = GraphifyRepository(applicationContext)
@@ -75,55 +67,34 @@ class OverlayService : Service() {
         }
 
         socketServer.start()
-        windowManager = getSystemService(WindowManager::class.java)
-        showFloatingWidget()
 
         stateCollectJob = serviceScope.launch {
             agentCore.state.collect { state ->
-                val status = overlayView?.findViewById<TextView>(R.id.status_text)
-                val confirmationPending =
-                    state is com.openjarvis.agent.AgentState.AwaitingConfirmation
-
-                status?.text = when (state) {
-                    is com.openjarvis.agent.AgentState.Idle -> "Ready"
-                    is com.openjarvis.agent.AgentState.Running -> state.step
-                    is com.openjarvis.agent.AgentState.AwaitingConfirmation -> "Confirmation required"
+                when (state) {
                     is com.openjarvis.agent.AgentState.Done -> {
                         voiceManager.speak(state.result)
-                        state.result
+                        processingCommand = false
+                        scheduleWakeListening(1600L)
                     }
                     is com.openjarvis.agent.AgentState.Error -> {
                         voiceManager.speak(state.message)
-                        state.message
+                        processingCommand = false
+                        scheduleWakeListening(1800L)
                     }
+                    else -> Unit
                 }
-
-                val confirmationText = overlayView?.findViewById<TextView>(R.id.confirmation_text)
-                confirmationText?.visibility = if (confirmationPending) View.VISIBLE else View.GONE
-                if (state is com.openjarvis.agent.AgentState.AwaitingConfirmation) {
-                    confirmationText?.text = state.summary
-                }
-                overlayView?.findViewById<View>(R.id.confirmation_actions)?.visibility =
-                    if (confirmationPending) View.VISIBLE else View.GONE
-                overlayView?.findViewById<View>(R.id.send_button)?.visibility =
-                    if (confirmationPending) View.GONE else View.VISIBLE
             }
         }
 
         voiceCollectJob = serviceScope.launch {
             voiceManager.state.collect { voiceState ->
-                val input = overlayView?.findViewById<EditText>(R.id.command_input)
-                val status = overlayView?.findViewById<TextView>(R.id.status_text)
                 when (voiceState) {
-                    is VoiceManager.VoiceState.Recording -> status?.text = "Listening..."
-                    is VoiceManager.VoiceState.Transcribing -> status?.text = "Transcribing..."
-                    is VoiceManager.VoiceState.Result -> {
-                        input?.setText(voiceState.text)
-                        input?.setSelection(input.text.length)
-                        status?.text = "Voice text ready"
+                    is VoiceManager.VoiceState.Result -> handleRecognizedSpeech(voiceState.text)
+                    is VoiceManager.VoiceState.Error -> {
+                        Log.w(TAG, "Speech recognition failed: ${voiceState.message}")
+                        if (!processingCommand) scheduleWakeListening(1800L)
                     }
-                    is VoiceManager.VoiceState.Error -> status?.text = voiceState.message
-                    VoiceManager.VoiceState.Idle -> Unit
+                    else -> Unit
                 }
             }
         }
@@ -151,13 +122,15 @@ class OverlayService : Service() {
 
         try {
             voiceManager.initialize()
+            voiceManager.setVoiceEnabled(true)
+            scheduleWakeListening(900L)
         } catch (error: Exception) {
             Log.e(TAG, "Voice initialization failed", error)
         }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        return START_STICKY
+        return START_NOT_STICKY
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -165,122 +138,69 @@ class OverlayService : Service() {
     override fun onDestroy() {
         stateCollectJob?.cancel()
         voiceCollectJob?.cancel()
+        wakeRestartJob?.cancel()
         serviceScope.cancel()
-        removeOverlayView()
         if (::socketServer.isInitialized) socketServer.stop()
         if (::voiceManager.isInitialized) voiceManager.release()
         super.onDestroy()
     }
 
-    private fun showFloatingWidget() {
-        val manager = windowManager ?: return
-        removeOverlayView()
-
-        val view = LayoutInflater.from(this).inflate(R.layout.overlay_floating, null, false)
-        val params = WindowManager.LayoutParams(
-            dp(56),
-            dp(56),
-            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
-            PixelFormat.TRANSLUCENT
-        ).apply {
-            gravity = Gravity.TOP or Gravity.END
-            x = dp(16)
-            y = dp(160)
+    private fun handleRecognizedSpeech(spokenText: String) {
+        if (processingCommand) return
+        val text = spokenText.trim()
+        if (text.isBlank()) {
+            scheduleWakeListening(700L)
+            return
+        }
+        if (waitingForCommand) {
+            waitingForCommand = false
+            executeVoiceCommand(text)
+            return
         }
 
-        view.setOnClickListener { showExpandedWidget() }
-        try {
-            manager.addView(view, params)
-            overlayView = view
-        } catch (error: Exception) {
-            Log.e(TAG, "Unable to display floating widget", error)
-        }
-    }
-
-    private fun showExpandedWidget() {
-        val manager = windowManager ?: return
-        removeOverlayView()
-
-        val view = LayoutInflater.from(this).inflate(R.layout.overlay_expanded, null, false)
-        val params = WindowManager.LayoutParams(
-            WindowManager.LayoutParams.MATCH_PARENT,
-            WindowManager.LayoutParams.WRAP_CONTENT,
-            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-            WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
-                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
-            PixelFormat.TRANSLUCENT
-        ).apply {
-            gravity = Gravity.TOP
-            softInputMode = WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
+        val normalized = text.lowercase(Locale.ROOT).replace('‌', ' ')
+        val wakePhrases = listOf("سلام جارویس", "سلام جاویس", "hey jarvis", "hi jarvis", "جارویس")
+        val phrase = wakePhrases.firstOrNull { normalized.contains(it) }
+        if (phrase == null) {
+            scheduleWakeListening(500L)
+            return
         }
 
-        view.findViewById<View>(R.id.minimize_button).setOnClickListener {
-            showFloatingWidget()
-        }
-        view.findViewById<View>(R.id.confirm_action_button).setOnClickListener {
-            agentCore.respondToPendingConfirmation(true)
-        }
-        view.findViewById<View>(R.id.cancel_action_button).setOnClickListener {
-            agentCore.respondToPendingConfirmation(false)
-        }
-
-        view.findViewById<View>(R.id.voice_button).setOnTouchListener { _, event ->
-            when (event.action) {
-                MotionEvent.ACTION_DOWN -> {
-                    if (!voiceManager.isVoiceEnabled()) {
-                        Toast.makeText(this, "Enable Voice Assistant in Settings first", Toast.LENGTH_SHORT).show()
-                    } else if (voiceManager.getSTTMode() == STTMode.AUTO_VAD) {
-                        voiceManager.startListeningWithVAD()
-                    } else {
-                        voiceManager.startListening()
-                    }
-                    true
-                }
-                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                    if (voiceManager.getSTTMode() == STTMode.PUSH_TO_TALK) {
-                        voiceManager.stopListening()
-                    }
-                    true
-                }
-                else -> true
-            }
-        }
-
-        view.findViewById<View>(R.id.send_button).setOnClickListener {
-            val input = view.findViewById<EditText>(R.id.command_input)
-            val command = input.text?.toString()?.trim().orEmpty()
-            if (command.isNotEmpty()) {
-                executeCommand(command)
-                input.text?.clear()
-                view.findViewById<TextView>(R.id.status_text).text = "Working..."
-            }
-        }
-
-        try {
-            manager.addView(view, params)
-            overlayView = view
-            view.findViewById<TextView>(R.id.status_text).text = "Ready"
-        } catch (error: Exception) {
-            Log.e(TAG, "Unable to expand floating widget", error)
-            showFloatingWidget()
+        val commandStart = normalized.indexOf(phrase) + phrase.length
+        val command = text.substring(commandStart).trim().trim(',', '،', '.', '!', '؟', '?')
+        if (command.isNotBlank()) {
+            executeVoiceCommand(command)
+        } else {
+            waitingForCommand = true
+            voiceManager.speak("بله، بفرما.")
+            scheduleWakeListening(2500L)
         }
     }
 
-    private fun removeOverlayView() {
-        val view = overlayView ?: return
-        try {
-            windowManager?.removeViewImmediate(view)
-        } catch (error: Exception) {
-            Log.w(TAG, "Floating widget was already detached", error)
-        } finally {
-            overlayView = null
+    private fun executeVoiceCommand(command: String) {
+        if (command.isBlank()) {
+            scheduleWakeListening(500L)
+            return
         }
+        processingCommand = true
+        voiceManager.resetState()
+        executeCommand(command)
     }
 
-    private fun dp(value: Int): Int =
-        (value * resources.displayMetrics.density).toInt()
+    private fun scheduleWakeListening(delayMs: Long) {
+        wakeRestartJob?.cancel()
+        wakeRestartJob = serviceScope.launch {
+            delay(delayMs)
+            if (!isInitialized || processingCommand || !::voiceManager.isInitialized) return@launch
+            if (androidx.core.content.ContextCompat.checkSelfPermission(
+                    this@OverlayService,
+                    android.Manifest.permission.RECORD_AUDIO
+                ) != android.content.pm.PackageManager.PERMISSION_GRANTED
+            ) return@launch
+            voiceManager.resetState()
+            voiceManager.startListeningWithVAD()
+        }
+    }
 
     private fun createNotification(): Notification {
         val channel = NotificationChannel(
@@ -288,7 +208,7 @@ class OverlayService : Service() {
             getString(R.string.notification_channel_name),
             NotificationManager.IMPORTANCE_LOW
         ).apply {
-            description = getString(R.string.notification_channel_description)
+            description = "وضعیت فعال بودن شنود صوتی جارویس"
         }
 
         val notificationManager = getSystemService(NotificationManager::class.java)
@@ -303,7 +223,7 @@ class OverlayService : Service() {
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle(getString(R.string.notification_title))
-            .setContentText(getString(R.string.notification_text))
+            .setContentText("جارویس فعال است و منتظر فرمان صوتی است")
             .setSmallIcon(R.drawable.ic_notification)
             .setContentIntent(pendingIntent)
             .setOngoing(true)
@@ -331,7 +251,7 @@ class OverlayService : Service() {
 
     companion object {
         private const val TAG = "OpenJarvisOverlay"
-        private const val CHANNEL_ID = "jarvis_overlay_channel"
+        private const val CHANNEL_ID = "jarvis_voice_channel"
         private const val NOTIFICATION_ID = 1
 
         fun start(context: Context) {

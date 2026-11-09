@@ -395,11 +395,6 @@ fun SettingsScreen(
                 
                 Spacer(modifier = Modifier.height(12.dp))
                 
-                PermissionRow(
-                    title = "نمایش روی برنامه‌ها",
-                    subtitle = "Required — Tap to enable"
-                )
-                
                 Spacer(modifier = Modifier.height(32.dp))
                 
                 SectionLabel("درباره برنامه")

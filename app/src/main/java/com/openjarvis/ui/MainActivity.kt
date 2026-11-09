@@ -43,14 +43,11 @@ class MainActivity : ComponentActivity() {
         setContent {
             OpenJarvisTheme {
                 val accessibilityEnabled = isAccessibilityServiceEnabled()
-                val overlayEnabled = Settings.canDrawOverlays(this)
 
-                if (!accessibilityEnabled || !overlayEnabled) {
+                if (!accessibilityEnabled) {
                     PermissionScreen(
                         accessibilityEnabled = accessibilityEnabled,
-                        overlayEnabled = overlayEnabled,
                         onEnableAccessibility = { startAccessibilitySettings() },
-                        onEnableOverlay = { startOverlaySettings() }
                     )
                 } else {
                     DashboardScreen(
@@ -78,15 +75,6 @@ class MainActivity : ComponentActivity() {
         startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
     }
 
-    private fun startOverlaySettings() {
-        startActivity(
-            Intent(
-                Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                android.net.Uri.parse("package:$packageName")
-            )
-        )
-    }
-
     private fun startOverlayService() {
         if (ContextCompat.checkSelfPermission(
                 this,
@@ -98,6 +86,7 @@ class MainActivity : ComponentActivity() {
                 arrayOf(Manifest.permission.RECORD_AUDIO),
                 AUDIO_PERMISSION_REQUEST
             )
+            return
         }
 
         try {
@@ -109,6 +98,18 @@ class MainActivity : ComponentActivity() {
                 "جارویس شروع نشد: ${error.message ?: "خطای ناشناخته"}",
                 Toast.LENGTH_LONG
             ).show()
+        }
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == AUDIO_PERMISSION_REQUEST &&
+            grantResults.isNotEmpty() &&
+            grantResults[0] == PackageManager.PERMISSION_GRANTED
+        ) {
+            startOverlayService()
+        } else if (requestCode == AUDIO_PERMISSION_REQUEST) {
+            Toast.makeText(this, "برای استفاده از دستیار صوتی، اجازهٔ میکروفون لازم است.", Toast.LENGTH_LONG).show()
         }
     }
 
@@ -124,9 +125,7 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun PermissionScreen(
     accessibilityEnabled: Boolean,
-    overlayEnabled: Boolean,
     onEnableAccessibility: () -> Unit,
-    onEnableOverlay: () -> Unit
 ) {
     val primaryColor = com.openjarvis.ui.theme.VoidColor.Violet
     val onSurfaceColor = com.openjarvis.ui.theme.VoidColor.TextPrimary
@@ -168,16 +167,7 @@ fun PermissionScreen(
             androidx.compose.foundation.layout.Spacer(modifier = Modifier.height(16.dp))
         }
 
-        if (!overlayEnabled) {
-            androidx.compose.material3.Button(
-                onClick = onEnableOverlay,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                androidx.compose.material3.Text("اجازه نمایش روی برنامه‌ها")
-            }
-        }
-
-        if (accessibilityEnabled && overlayEnabled) {
+        if (accessibilityEnabled) {
             androidx.compose.material3.Text(
                 text = "جارویس فعاله",
                 style = androidx.compose.material3.MaterialTheme.typography.titleMedium,
