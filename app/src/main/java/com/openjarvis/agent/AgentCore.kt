@@ -236,10 +236,10 @@ RULES:
                             executeActions(actions)
 
                             graphifyRepo.logTask(
-                                cleanCommand = safeCommand,
-                                result = "success",
-                                provider = universalAdapter.getProviderName(),
-                                latencyMs = latency
+                                safeCommand,
+                                "success",
+                                universalAdapter.getProviderName(),
+                                latency
                             )
 
                             analysisEngine.analyzeLastTask()
@@ -286,10 +286,10 @@ RULES:
                         )
 
                     graphifyRepo.logTask(
-                        cleanCommand = cleanCommand,
-                        result = "failed: ${e.message}",
-                        provider = "",
-                        latencyMs = 0
+                        cleanCommand,
+                        "failed: ${e.message}",
+                        "",
+                        0L
                     )
                 }
             }
