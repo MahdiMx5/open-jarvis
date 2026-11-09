@@ -36,21 +36,28 @@ class ScreenReader(@Suppress("UNUSED_PARAMETER") context: Context) {
         return result
     }
 
-    private fun findNodeRecursive(node: AccessibilityNodeInfo, text: String): AccessibilityNodeInfo? {
-        val normalizedText = text.lowercase()
+    private fun findNodeRecursive(root: AccessibilityNodeInfo, text: String): AccessibilityNodeInfo? {
+        val normalizedText = text.trim().lowercase()
+        if (normalizedText.isEmpty()) return null
+
         val queue = ArrayDeque<AccessibilityNodeInfo>()
-        queue.add(node)
+        queue.add(root)
         while (queue.isNotEmpty()) {
             val current = queue.removeFirst()
             val nodeText = current.text?.toString()?.lowercase()
             val contentDesc = current.contentDescription?.toString()?.lowercase()
-            if (nodeText?.contains(normalizedText) == true || contentDesc?.contains(normalizedText) == true) {
-                return current
+            if (nodeText?.contains(normalizedText) == true ||
+                contentDesc?.contains(normalizedText) == true
+            ) {
+                val result = AccessibilityNodeInfo.obtain(current)
+                if (current !== root) current.recycle()
+                while (queue.isNotEmpty()) queue.removeFirst().recycle()
+                return result
             }
             for (i in 0 until current.childCount) {
                 current.getChild(i)?.let(queue::add)
             }
-            current.recycle()
+            if (current !== root) current.recycle()
         }
         return null
     }
@@ -62,19 +69,24 @@ class ScreenReader(@Suppress("UNUSED_PARAMETER") context: Context) {
         return result
     }
 
-    private fun findHintRecursive(node: AccessibilityNodeInfo, hint: String): AccessibilityNodeInfo? {
-        val normalizedHint = hint.lowercase()
+    private fun findHintRecursive(root: AccessibilityNodeInfo, hint: String): AccessibilityNodeInfo? {
+        val normalizedHint = hint.trim().lowercase()
+        if (normalizedHint.isEmpty()) return null
+
         val queue = ArrayDeque<AccessibilityNodeInfo>()
-        queue.add(node)
+        queue.add(root)
         while (queue.isNotEmpty()) {
             val current = queue.removeFirst()
             if (current.hintText?.toString()?.lowercase()?.contains(normalizedHint) == true) {
-                return current
+                val result = AccessibilityNodeInfo.obtain(current)
+                if (current !== root) current.recycle()
+                while (queue.isNotEmpty()) queue.removeFirst().recycle()
+                return result
             }
             for (i in 0 until current.childCount) {
                 current.getChild(i)?.let(queue::add)
             }
-            current.recycle()
+            if (current !== root) current.recycle()
         }
         return null
     }
