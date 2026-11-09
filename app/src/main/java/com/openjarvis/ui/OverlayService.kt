@@ -9,7 +9,14 @@ import android.content.Context
 import android.content.Intent
 import android.os.IBinder
 import android.util.Log
+import android.view.Gravity
+import android.view.LayoutInflater
+import android.view.View
 import android.view.WindowManager
+import android.graphics.PixelFormat
+import android.view.inputmethod.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
+import android.widget.EditText
+import android.widget.TextView
 import androidx.core.app.NotificationCompat
 import com.openjarvis.R
 import com.openjarvis.agent.AgentCore
@@ -20,13 +27,18 @@ import com.openjarvis.voice.VoiceManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.flow.collect
 
 class OverlayService : Service() {
 
     private var windowManager: WindowManager? = null
+    private var overlayView: View? = null
+    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
     private lateinit var agentCore: AgentCore
     private lateinit var voiceManager: VoiceManager
@@ -60,6 +72,20 @@ class OverlayService : Service() {
         }
 
         socketServer.start()
+        windowManager = getSystemService(WindowManager::class.java)
+        showFloatingWidget()
+
+        stateCollectJob = serviceScope.launch {
+            agentCore.state.collect { state ->
+                val status = overlayView?.findViewById<TextView>(R.id.status_text)
+                status?.text = when (state) {
+                    is com.openjarvis.agent.AgentState.Idle -> "Ready"
+                    is com.openjarvis.agent.AgentState.Running -> state.step
+                    is com.openjarvis.agent.AgentState.Done -> state.result
+                    is com.openjarvis.agent.AgentState.Error -> state.message
+                }
+            }
+        }
 
         CoroutineScope(Dispatchers.IO).launch {
             runCatching {
@@ -97,10 +123,93 @@ class OverlayService : Service() {
 
     override fun onDestroy() {
         stateCollectJob?.cancel()
+        serviceScope.cancel()
+        removeOverlayView()
         if (::socketServer.isInitialized) socketServer.stop()
         if (::voiceManager.isInitialized) voiceManager.release()
         super.onDestroy()
     }
+
+    private fun showFloatingWidget() {
+        val manager = windowManager ?: return
+        removeOverlayView()
+
+        val view = LayoutInflater.from(this).inflate(R.layout.overlay_floating, null, false)
+        val params = WindowManager.LayoutParams(
+            dp(56),
+            dp(56),
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+            PixelFormat.TRANSLUCENT
+        ).apply {
+            gravity = Gravity.TOP or Gravity.END
+            x = dp(16)
+            y = dp(160)
+        }
+
+        view.setOnClickListener { showExpandedWidget() }
+        try {
+            manager.addView(view, params)
+            overlayView = view
+        } catch (error: Exception) {
+            Log.e(TAG, "Unable to display floating widget", error)
+        }
+    }
+
+    private fun showExpandedWidget() {
+        val manager = windowManager ?: return
+        removeOverlayView()
+
+        val view = LayoutInflater.from(this).inflate(R.layout.overlay_expanded, null, false)
+        val params = WindowManager.LayoutParams(
+            WindowManager.LayoutParams.MATCH_PARENT,
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+            WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
+            PixelFormat.TRANSLUCENT
+        ).apply {
+            gravity = Gravity.TOP
+            softInputMode = SOFT_INPUT_ADJUST_RESIZE
+        }
+
+        view.findViewById<View>(R.id.minimize_button).setOnClickListener {
+            showFloatingWidget()
+        }
+        view.findViewById<View>(R.id.send_button).setOnClickListener {
+            val input = view.findViewById<EditText>(R.id.command_input)
+            val command = input.text?.toString()?.trim().orEmpty()
+            if (command.isNotEmpty()) {
+                executeCommand(command)
+                input.text?.clear()
+                view.findViewById<TextView>(R.id.status_text).text = "Working..."
+            }
+        }
+
+        try {
+            manager.addView(view, params)
+            overlayView = view
+            view.findViewById<TextView>(R.id.status_text).text = "Ready"
+        } catch (error: Exception) {
+            Log.e(TAG, "Unable to expand floating widget", error)
+            showFloatingWidget()
+        }
+    }
+
+    private fun removeOverlayView() {
+        val view = overlayView ?: return
+        try {
+            windowManager?.removeViewImmediate(view)
+        } catch (error: Exception) {
+            Log.w(TAG, "Floating widget was already detached", error)
+        } finally {
+            overlayView = null
+        }
+    }
+
+    private fun dp(value: Int): Int =
+        (value * resources.displayMetrics.density).toInt()
 
     private fun createNotification(): Notification {
         val channel = NotificationChannel(
