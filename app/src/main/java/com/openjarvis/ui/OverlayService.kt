@@ -89,11 +89,11 @@ class OverlayService : Service() {
                     is com.openjarvis.agent.AgentState.Running -> state.step
                     is com.openjarvis.agent.AgentState.AwaitingConfirmation -> "Confirmation required"
                     is com.openjarvis.agent.AgentState.Done -> {
-                        voiceManager.speak("انجام شد")
+                        voiceManager.speak(state.result)
                         state.result
                     }
                     is com.openjarvis.agent.AgentState.Error -> {
-                        voiceManager.speak("یه مشکلی پیش اومد")
+                        voiceManager.speak(state.message)
                         state.message
                     }
                 }
