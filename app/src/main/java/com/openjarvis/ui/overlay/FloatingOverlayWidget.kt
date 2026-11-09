@@ -366,6 +366,7 @@ private fun StatusOrb(state: AgentState) {
     val color = when (state) {
         is AgentState.Idle -> VoidColor.Violet
         is AgentState.Running -> VoidColor.Cyan
+        is AgentState.AwaitingConfirmation -> VoidColor.Cyan
         is AgentState.Done -> VoidColor.Green
         is AgentState.Error -> VoidColor.Red
     }
@@ -397,6 +398,7 @@ private fun StatusLine(state: AgentState, stepText: String) {
     val textColor = when (state) {
         is AgentState.Idle -> VoidColor.TextDisabled
         is AgentState.Running -> VoidColor.Cyan
+        is AgentState.AwaitingConfirmation -> VoidColor.Cyan
         is AgentState.Done -> VoidColor.Green
         is AgentState.Error -> VoidColor.Red
     }
