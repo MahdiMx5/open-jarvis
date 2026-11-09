@@ -14,7 +14,6 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.WindowManager
 import android.graphics.PixelFormat
-import android.view.inputmethod.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
 import android.widget.EditText
 import android.widget.TextView
 import androidx.core.app.NotificationCompat
@@ -171,7 +170,7 @@ class OverlayService : Service() {
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP
-            softInputMode = SOFT_INPUT_ADJUST_RESIZE
+            softInputMode = WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
         }
 
         view.findViewById<View>(R.id.minimize_button).setOnClickListener {
