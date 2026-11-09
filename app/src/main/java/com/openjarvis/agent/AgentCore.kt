@@ -47,6 +47,17 @@ class AgentCore(private val context: Context) {
 
     val state: StateFlow<AgentState> = _state
 
+    private val chatSystemPrompt = """
+You are Jarvis, a helpful voice-first assistant.
+Reply in the same language as the user.
+For Persian, use natural everyday conversational Persian (محاوره‌ای), warm but not overly formal.
+For English, use clear natural conversational English.
+Keep replies concise unless the user asks for detail.
+Do not output JSON, markdown fences, or action plans in chat mode.
+Do not claim you performed actions on the device.
+If you are unsure, say so plainly.
+""".trimIndent()
+
     private val systemPrompt = """
 You are Open Jarvis - an Android device control AI agent.
 The user gives you a cleanCommand in natural language.
@@ -122,6 +133,31 @@ RULES:
                             sanitized.text
 
                         else -> cleanCommand
+                    }
+
+                    if (isConversationalCommand(safeCommand)) {
+                        _state.value = AgentState.Running("دارم جوابت رو آماده می‌کنم...")
+                        val chatResult = universalAdapter.complete(chatSystemPrompt, safeCommand)
+                        chatResult.fold(
+                            onSuccess = { answer ->
+                                val cleanAnswer = answer.trim().take(4000)
+                                if (cleanAnswer.isBlank()) {
+                                    _state.value = AgentState.Error("پاسخی دریافت نشد")
+                                } else {
+                                    graphifyRepo.logTask(
+                                        safeCommand,
+                                        "chat response",
+                                        universalAdapter.getProviderName(),
+                                        0L
+                                    )
+                                    _state.value = AgentState.Done(cleanAnswer)
+                                }
+                            },
+                            onFailure = { error ->
+                                _state.value = AgentState.Error(error.message ?: "ارتباط با مدل برقرار نشد")
+                            }
+                        )
+                        return@withLock
                     }
 
                     _state.value =
@@ -230,8 +266,7 @@ RULES:
 
                             analysisEngine.analyzeLastTask()
 
-                            _state.value =
-                                AgentState.Done("done in ${latency}ms")
+                            _state.value = AgentState.Done("انجام شد")
                         },
 
                         onFailure = { error ->
@@ -280,6 +315,26 @@ RULES:
                 }
             }
         }
+    }
+
+    private fun isConversationalCommand(command: String): Boolean {
+        val value = command.trim().lowercase()
+        val deviceActionStarts = listOf(
+            "open ", "launch ", "tap ", "click ", "type ", "send ", "press ",
+            "باز کن", "بازش کن", "اجرا کن", "برو به", "بزن روی", "ارسال کن",
+            "بنویس", "روشن کن", "خاموش کن", "اسکرول"
+        )
+        if (deviceActionStarts.any { value.startsWith(it) }) return false
+
+        val conversationalMarkers = listOf(
+            "سلام", "درود", "چطوری", "حالت چطوره", "چی هست", "چیه", "یعنی چی",
+            "چطور", "چجوری", "چرا", "توضیح", "معنی", "ترجمه", "کمک", "راهنمایی",
+            "برنامه نویسی", "برنامه‌نویسی", "کدنویسی", "سوال", "سؤال",
+            "hello", "hi ", "hey ", "what ", "why ", "how ", "explain",
+            "translate", "meaning", "help me", "can you explain", "tell me"
+        )
+        return value.contains('?') || value.contains('؟') ||
+            conversationalMarkers.any { value.contains(it) }
     }
 
     fun respondToPendingConfirmation(approved: Boolean) {
