@@ -17,7 +17,13 @@ class AndroidTTSEngine(private val context: Context) {
         tts = TextToSpeech(context) { status ->
             if (status == TextToSpeech.SUCCESS) {
                 isReady = true
-                tts?.language = Locale.US
+                val preferredLocale = Locale.getDefault()
+                val languageResult = tts?.setLanguage(preferredLocale)
+                if (languageResult == TextToSpeech.LANG_MISSING_DATA ||
+                    languageResult == TextToSpeech.LANG_NOT_SUPPORTED
+                ) {
+                    tts?.setLanguage(Locale.US)
+                }
                 tts?.setSpeechRate(speechRate)
                 tts?.setPitch(pitch)
                 
