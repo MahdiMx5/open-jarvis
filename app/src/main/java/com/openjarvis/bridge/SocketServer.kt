@@ -143,7 +143,7 @@ class SocketServer(
             """{"id":${task.id},"command":"${escapeJson(task.command)}","result":"${escapeJson(task.result)}","timestamp":${task.timestamp}}"""
         }
         
-        writer.println("""{"requestId":"$requestId","status":"done","result":$tasksJson}""")
+        writer.println("""{"requestId":"${escapeJson(requestId)}","status":"done","result":$tasksJson}""")
     }
 
     private suspend fun handleProviders(writer: PrintWriter, requestId: String) {
@@ -152,12 +152,12 @@ class SocketServer(
             """{"name":"${escapeJson(p.name)}","useCount":${p.useCount},"successRate":${p.successRate}}"""
         }
         
-        writer.println("""{"requestId":"$requestId","status":"done","result":$providersJson}""")
+        writer.println("""{"requestId":"${escapeJson(requestId)}","status":"done","result":$providersJson}""")
     }
 
     private suspend fun handleMemory(writer: PrintWriter, requestId: String) {
         val context = graphifyRepo.buildMemoryContext("")
-        val contextJson = """{"requestId":"$requestId","status":"done","result":"${escapeJson(context)}"}"""
+        val contextJson = """{"requestId":"${escapeJson(requestId)}","status":"done","result":"${escapeJson(context)}"}"""
         
         writer.println(contextJson)
     }
@@ -223,7 +223,7 @@ class SocketServer(
     }
 
     internal fun createErrorResponse(requestId: String, error: String): String {
-        return """{"requestId":"$requestId","status":"error","result":"$error"}"""
+        return """{"requestId":"${escapeJson(requestId)}","status":"error","result":"${escapeJson(error)}"}"""
     }
 
     internal fun escapeJson(s: String): String {
