@@ -174,10 +174,8 @@ class AndroidSTTEngine(private val context: Context) : STTEngine {
         recognizer?.cancel()
         recognizer?.destroy()
         recognizer = null
-        audioRecord?.runCatching {
-            stop()
-            release()
-        }
+        runCatching { audioRecord?.stop() }
+        runCatching { audioRecord?.release() }
         audioRecord = null
         scope.cancel()
     }
