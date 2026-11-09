@@ -36,11 +36,15 @@ class JarvisAccessibilityService : AccessibilityService() {
         super.onDestroy()
     }
 
-    fun openAppByPackage(packageName: String) {
-        val intent = packageManager.getLaunchIntentForPackage(packageName)
-        if (intent != null) {
+    fun openAppByPackage(packageName: String): Boolean {
+        if (packageName.isBlank()) return false
+        val intent = packageManager.getLaunchIntentForPackage(packageName) ?: return false
+        return try {
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             startActivity(intent)
+            true
+        } catch (_: Exception) {
+            false
         }
     }
 
@@ -56,8 +60,7 @@ class JarvisAccessibilityService : AccessibilityService() {
         for (app in apps) {
             val appLabel = app.loadLabel(pm).toString().lowercase()
             if (appLabel.contains(normalizedLabel) || normalizedLabel.contains(appLabel)) {
-                openAppByPackage(app.activityInfo.packageName)
-                return true
+                return openAppByPackage(app.activityInfo.packageName)
             }
         }
         return false
