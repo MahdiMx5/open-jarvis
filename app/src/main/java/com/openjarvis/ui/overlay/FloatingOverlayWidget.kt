@@ -163,6 +163,7 @@ private fun CollapsedPill(
     val statusColor = when (agentState) {
         is AgentState.Idle -> VoidColor.Violet
         is AgentState.Running -> VoidColor.Cyan
+        is AgentState.AwaitingConfirmation -> VoidColor.Cyan
         is AgentState.Done -> VoidColor.Green
         is AgentState.Error -> VoidColor.Red
     }
@@ -238,6 +239,7 @@ private fun ExpandedOverlay(
 ) {
     val stepText = when (agentState) {
         is AgentState.Running -> agentState.step
+        is AgentState.AwaitingConfirmation -> "Confirmation required"
         is AgentState.Done -> agentState.result
         is AgentState.Error -> agentState.message
         else -> ""
