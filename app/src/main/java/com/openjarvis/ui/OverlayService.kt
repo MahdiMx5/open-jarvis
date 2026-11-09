@@ -77,12 +77,26 @@ class OverlayService : Service() {
         stateCollectJob = serviceScope.launch {
             agentCore.state.collect { state ->
                 val status = overlayView?.findViewById<TextView>(R.id.status_text)
+                val confirmationPending =
+                    state is com.openjarvis.agent.AgentState.AwaitingConfirmation
+
                 status?.text = when (state) {
                     is com.openjarvis.agent.AgentState.Idle -> "Ready"
                     is com.openjarvis.agent.AgentState.Running -> state.step
+                    is com.openjarvis.agent.AgentState.AwaitingConfirmation -> "Confirmation required"
                     is com.openjarvis.agent.AgentState.Done -> state.result
                     is com.openjarvis.agent.AgentState.Error -> state.message
                 }
+
+                val confirmationText = overlayView?.findViewById<TextView>(R.id.confirmation_text)
+                confirmationText?.visibility = if (confirmationPending) View.VISIBLE else View.GONE
+                if (state is com.openjarvis.agent.AgentState.AwaitingConfirmation) {
+                    confirmationText?.text = state.summary
+                }
+                overlayView?.findViewById<View>(R.id.confirmation_actions)?.visibility =
+                    if (confirmationPending) View.VISIBLE else View.GONE
+                overlayView?.findViewById<View>(R.id.send_button)?.visibility =
+                    if (confirmationPending) View.GONE else View.VISIBLE
             }
         }
 
@@ -176,6 +190,13 @@ class OverlayService : Service() {
         view.findViewById<View>(R.id.minimize_button).setOnClickListener {
             showFloatingWidget()
         }
+        view.findViewById<View>(R.id.confirm_action_button).setOnClickListener {
+            agentCore.respondToPendingConfirmation(true)
+        }
+        view.findViewById<View>(R.id.cancel_action_button).setOnClickListener {
+            agentCore.respondToPendingConfirmation(false)
+        }
+
         view.findViewById<View>(R.id.send_button).setOnClickListener {
             val input = view.findViewById<EditText>(R.id.command_input)
             val command = input.text?.toString()?.trim().orEmpty()
