@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.cancel
 
 class VoiceManager(private val context: Context) {
 
@@ -53,6 +54,8 @@ class VoiceManager(private val context: Context) {
         // Apply saved settings
         ttsEngine.setSpeechRate(getSpeechRate())
     }
+
+    fun initialize() { ttsEngine.setSpeechRate(getSpeechRate()) }
 
     fun isVoiceEnabled(): Boolean = prefs.getBoolean(KEY_VOICE_ENABLED, false)
 
