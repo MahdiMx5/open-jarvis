@@ -21,6 +21,7 @@ class VoiceManager(private val context: Context) {
         private const val KEY_STT_MODE = "stt_mode"
         private const val KEY_SPEAK_RESULTS = "speak_results"
         private const val KEY_SPEECH_RATE = "speech_rate"
+        private const val KEY_RECOGNITION_LANGUAGE = "recognition_language"
     }
 
     private val masterKey = MasterKey.Builder(context)
@@ -53,6 +54,7 @@ class VoiceManager(private val context: Context) {
     init {
         // Apply saved settings
         ttsEngine.setSpeechRate(getSpeechRate())
+        sttEngine.setRecognitionLanguage(getRecognitionLanguage())
     }
 
     fun initialize() { ttsEngine.setSpeechRate(getSpeechRate()) }
@@ -82,7 +84,15 @@ class VoiceManager(private val context: Context) {
         prefs.edit().putBoolean(KEY_SPEAK_RESULTS, enabled).apply()
     }
 
-    fun getSpeechRate(): Float = prefs.getFloat(KEY_SPEECH_RATE, 1.05f)
+    fun getSpeechRate(): Float = prefs.getFloat(KEY_SPEECH_RATE, 0.96f)
+
+    fun getRecognitionLanguage(): String = prefs.getString(KEY_RECOGNITION_LANGUAGE, "fa-IR") ?: "fa-IR"
+
+    fun setRecognitionLanguage(languageTag: String) {
+        val safeLanguage = if (languageTag == "en-US") "en-US" else "fa-IR"
+        prefs.edit().putString(KEY_RECOGNITION_LANGUAGE, safeLanguage).apply()
+        sttEngine.setRecognitionLanguage(safeLanguage)
+    }
 
     fun setSpeechRate(rate: Float) {
         prefs.edit().putFloat(KEY_SPEECH_RATE, rate.coerceIn(0.5f, 2.0f)).apply()
