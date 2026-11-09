@@ -70,6 +70,10 @@ class SettingsActivity : ComponentActivity() {
             putString("provider_base_url", baseUrl)
             putString("provider_api_key", apiKey)
             putString("provider_model", model)
+            val providerKey = name.lowercase().replace(Regex("[^a-z0-9]+"), "_")
+            putString("provider_${providerKey}_base_url", baseUrl)
+            putString("provider_${providerKey}_api_key", apiKey)
+            putString("provider_${providerKey}_model", model)
             apply()
         }
     }
