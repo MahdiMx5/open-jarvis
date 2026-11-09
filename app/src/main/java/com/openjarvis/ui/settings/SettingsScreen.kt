@@ -64,6 +64,7 @@ fun SettingsScreen(
     var speechRate by remember { mutableFloatStateOf(voiceManager.getSpeechRate()) }
     var sttMode by remember { mutableStateOf(voiceManager.getSTTMode()) }
     var recognitionLanguage by remember { mutableStateOf(voiceManager.getRecognitionLanguage()) }
+    var showLanguageMenu by remember { mutableStateOf(false) }
     val sttModeLabel = if (sttMode == STTMode.PUSH_TO_TALK) "نگه‌داشتن میکروفون" else "تشخیص خودکار سکوت"
     
     LaunchedEffect(selectedProvider) {
@@ -258,38 +259,74 @@ fun SettingsScreen(
                     )
 
                     Button(
-                        onClick = { voiceManager.testSpeak("سلام! من جارویسم. چطوری؟") },
+                        onClick = {
+                            val sample = when (recognitionLanguage) {
+                                "en-US" -> "Hello! I am Jarvis. How can I help you?"
+                                "en-AU" -> "G’day! I’m Jarvis. How can I help you today?"
+                                "es-ES" -> "¡Hola! Soy Jarvis. ¿Cómo puedo ayudarte?"
+                                "de-DE" -> "Hallo! Ich bin Jarvis. Wie kann ich dir helfen?"
+                                else -> "سلام! من جارویسم. چطوری؟"
+                            }
+                            voiceManager.testSpeak(sample)
+                        },
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(14.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = VoidColor.VioletDim)
                     ) {
-                        Text("تست صدای فارسی")
+                        Text("تست صدای زبان انتخاب‌شده")
                     }
                     Spacer(modifier = Modifier.height(8.dp))
 
                     Surface(
-                        modifier = Modifier.fillMaxWidth().clickable {
-                            recognitionLanguage = if (recognitionLanguage == "fa-IR") "en-US" else "fa-IR"
-                            voiceManager.setRecognitionLanguage(recognitionLanguage)
-                        },
                         shape = RoundedCornerShape(16.dp),
                         color = VoidColor.Void900,
                         border = BorderStroke(1.dp, VoidColor.BorderSubtle)
                     ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(16.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column(Modifier.weight(1f)) {
-                                Text("زبان تشخیص صدا", color = VoidColor.TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-                                Text("برای فهمیدن حرف‌هات", color = VoidColor.TextDisabled, fontSize = 11.sp)
+                        Column {
+                            Row(
+                                modifier = Modifier.fillMaxWidth().clickable {
+                                    showLanguageMenu = true
+                                }.padding(16.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(Modifier.weight(1f)) {
+                                    Text("زبان تشخیص و پاسخ صوتی", color = VoidColor.TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                                    Text("زبان گفتار ورودی و صدای خروجی جارویس", color = VoidColor.TextDisabled, fontSize = 11.sp)
+                                }
+                                Text(
+                                    when (recognitionLanguage) {
+                                        "en-US" -> "English (US)"
+                                        "en-AU" -> "English (Australia)"
+                                        "es-ES" -> "Español"
+                                        "de-DE" -> "Deutsch"
+                                        else -> "فارسی"
+                                    },
+                                    color = VoidColor.Cyan,
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
                             }
-                            Text(
-                                if (recognitionLanguage == "fa-IR") "فارسی" else "English",
-                                color = VoidColor.Cyan,
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.SemiBold
-                            )
+                            DropdownMenu(
+                                expanded = showLanguageMenu,
+                                onDismissRequest = { showLanguageMenu = false }
+                            ) {
+                                listOf(
+                                    "fa-IR" to "فارسی",
+                                    "en-US" to "English (US)",
+                                    "en-AU" to "English (Australia)",
+                                    "es-ES" to "Español (España)",
+                                    "de-DE" to "Deutsch"
+                                ).forEach { (tag, label) ->
+                                    DropdownMenuItem(
+                                        text = { Text(label) },
+                                        onClick = {
+                                            recognitionLanguage = tag
+                                            voiceManager.setRecognitionLanguage(tag)
+                                            showLanguageMenu = false
+                                        }
+                                    )
+                                }
+                            }
                         }
                     }
                     Spacer(modifier = Modifier.height(8.dp))
