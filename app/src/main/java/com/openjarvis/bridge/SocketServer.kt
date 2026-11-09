@@ -1,8 +1,6 @@
 package com.openjarvis.bridge
 
 import android.content.Context
-import android.os.Build
-import android.os.Process
 import com.openjarvis.agent.AgentCore
 import com.openjarvis.agent.AgentState
 import com.openjarvis.graphify.GraphifyRepository
@@ -11,6 +9,7 @@ import kotlinx.coroutines.flow.collectLatest
 import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.io.PrintWriter
+import java.net.InetAddress
 import java.net.ServerSocket
 import java.net.Socket
 
@@ -29,21 +28,6 @@ class SocketServer(
     
     private val socketFile: java.io.File
         get() = java.io.File(context.filesDir, SOCKET_NAME)
-    
-    private val allowedUids = setOf(
-        context.applicationInfo.uid,
-        2000,
-        "com.termux".hashCode()
-    )
-
-    private fun isAuthorized(): Boolean {
-        return try {
-            val callingUid = Process.myUid()
-            callingUid in allowedUids
-        } catch (e: Exception) {
-            false
-        }
-    }
     
     companion object {
         private const val SOCKET_NAME = "jarvis.port"
@@ -77,7 +61,8 @@ class SocketServer(
 
     private suspend fun acceptConnections() = withContext(Dispatchers.IO) {
         try {
-            serverSocket = ServerSocket(0)
+            // Never expose the device-control bridge on Wi-Fi or other network interfaces.
+            serverSocket = ServerSocket(0, 16, InetAddress.getLoopbackAddress())
             runningPort = serverSocket?.localPort ?: 0
             
             val sockFile = socketFile
@@ -100,16 +85,12 @@ class SocketServer(
 
     private suspend fun handleClient(clientSocket: Socket) = withContext(Dispatchers.IO) {
         try {
+            clientSocket.soTimeout = 5000
             val reader = BufferedReader(InputStreamReader(clientSocket.getInputStream()))
             val writer = PrintWriter(clientSocket.getOutputStream(), true)
-            
-            val line = reader.readLine() ?: run {
-                writer.println("""{"error":"empty request"}""")
-                return@withContext
-            }
 
-            if (!isAuthorized()) {
-                writer.println(createErrorResponse("", "unauthorized"))
+            val line = readRequestLine(reader) ?: run {
+                writer.println("""{"error":"empty request"}""")
                 return@withContext
             }
 
@@ -211,6 +192,21 @@ class SocketServer(
         agentCore.executeTask(cmd)
         
         job.join()
+    }
+
+    private fun readRequestLine(reader: BufferedReader): String? {
+        val line = StringBuilder()
+        while (true) {
+            val value = reader.read()
+            if (value == -1) return if (line.isEmpty()) null else line.toString()
+            if (value == '\\n'.code) return line.toString()
+            if (value != '\\r'.code) {
+                if (line.length >= MAX_COMMAND_LENGTH) {
+                    throw IllegalArgumentException("Request is too long")
+                }
+                line.append(value.toChar())
+            }
+        }
     }
 
     private fun parseRequest(line: String): Pair<String, String>? {
