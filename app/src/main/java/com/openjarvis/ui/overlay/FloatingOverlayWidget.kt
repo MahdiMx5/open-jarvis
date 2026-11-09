@@ -43,6 +43,7 @@ import androidx.compose.ui.unit.sp
 import com.openjarvis.agent.AgentState
 import com.openjarvis.graphify.nodes.TaskNode
 import com.openjarvis.ui.theme.VoidColor
+import com.openjarvis.voice.STTMode
 import com.openjarvis.voice.VoiceManager
 import com.openjarvis.voice.VoiceManager.VoiceState
 import kotlinx.coroutines.delay
@@ -109,12 +110,18 @@ fun FloatingOverlayWidget(
                     commandText = suggestion
                 },
                 onVoicePressStart = {
-                    voiceManager?.startListening()
+                    if (voiceManager?.getSTTMode() == STTMode.AUTO_VAD) {
+                        voiceManager.startListeningWithVAD()
+                    } else {
+                        voiceManager?.startListening()
+                    }
                 },
                 onVoicePressEnd = {
-                    val text = voiceManager?.stopListening()
-                    if (!text.isNullOrBlank()) {
-                        commandText = text
+                    if (voiceManager?.getSTTMode() == STTMode.PUSH_TO_TALK) {
+                        val text = voiceManager.stopListening()
+                        if (!text.isNullOrBlank()) {
+                            commandText = text
+                        }
                     }
                 },
                 onCollapse = {
