@@ -23,16 +23,12 @@ class SocketServer(
     private var isRunning = false
     private var runningPort = 0
     
-    private var lastRequestTime = 0L
-    private var requestCount = 0
-    
     private val socketFile: java.io.File
         get() = java.io.File(context.filesDir, SOCKET_NAME)
     
     companion object {
         private const val SOCKET_NAME = "jarvis.port"
         private const val MAX_COMMAND_LENGTH = 2000
-        private const val MAX_REQUESTS_PER_SECOND = 10
     }
     
     fun start() {
@@ -128,12 +124,12 @@ class SocketServer(
         
         val statusJson = buildString {
             append("{")
-            append("\"requestId\": \"$requestId\",")
+            append("\"requestId\": \"${escapeJson(requestId)}\",")
             append("\"status\": \"done\",")
             append("\"result\": {")
             append("\"service\": \"running\",")
             append("\"accessibility\": $accessibilityEnabled,")
-            append("\"provider\": \"$provider\",")
+            append("\"provider\": \"${escapeJson(provider)}\",")
             append("\"port\": $runningPort")
             append("}}")
         }
@@ -153,7 +149,7 @@ class SocketServer(
     private suspend fun handleProviders(writer: PrintWriter, requestId: String) {
         val providers = graphifyRepo.getProviderStats()
         val providersJson = providers.joinToString(",", "[", "]") { p ->
-            """{"name":"${p.name}","useCount":${p.useCount},"successRate":${p.successRate}}"""
+            """{"name":"${escapeJson(p.name)}","useCount":${p.useCount},"successRate":${p.successRate}}"""
         }
         
         writer.println("""{"requestId":"$requestId","status":"done","result":$providersJson}""")
@@ -171,16 +167,16 @@ class SocketServer(
             agentCore.getStateFlow().collectLatest { state ->
                 when (state) {
                     is AgentState.Running -> {
-                        writer.println("""{"requestId":"$requestId","status":"progress","result":"${state.step}"}""")
+                        writer.println("""{"requestId":"${escapeJson(requestId)}","status":"progress","result":"${escapeJson(state.step)}"}""")
                         writer.flush()
                     }
                     is AgentState.Done -> {
-                        writer.println("""{"requestId":"$requestId","status":"done","result":"${escapeJson(state.result)}"}""")
+                        writer.println("""{"requestId":"${escapeJson(requestId)}","status":"done","result":"${escapeJson(state.result)}"}""")
                         writer.flush()
                         cancel()
                     }
                     is AgentState.Error -> {
-                        writer.println("""{"requestId":"$requestId","status":"error","result":"${escapeJson(state.message)}""")
+                        writer.println("""{"requestId":"${escapeJson(requestId)}","status":"error","result":"${escapeJson(state.message)}"}""")
                         writer.flush()
                         cancel()
                     }
