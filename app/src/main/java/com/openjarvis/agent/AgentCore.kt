@@ -235,6 +235,16 @@ RULES:
 
                             executeActions(actions)
 
+                            if (_state.value is AgentState.Error) {
+                                graphifyRepo.logTask(
+                                    safeCommand,
+                                    "failed: action execution",
+                                    universalAdapter.getProviderName(),
+                                    latency
+                                )
+                                return@fold
+                            }
+
                             graphifyRepo.logTask(
                                 safeCommand,
                                 "success",
@@ -331,51 +341,59 @@ RULES:
 
                 Action.OPEN_APP -> {
                     val label = action.label
+                    val packageName = action.packageName
+                        ?: label?.let(::findPackageByLabel)
+                    val service = JarvisAccessibilityService.instance
 
-                    if (label != null) {
-                        val packageName =
-                            findPackageByLabel(label)
-
-                        if (packageName != null) {
-                            JarvisAccessibilityService.instance
-                                ?.openAppByPackage(packageName)
-
-                            graphifyRepo.logAppOpened(
-                                packageName,
-                                label
-                            )
-                        } else {
-                            _state.value =
-                                AgentState.Error("App not found: $label")
-                            return
-                        }
+                    if (packageName.isNullOrBlank()) {
+                        _state.value = AgentState.Error("App not found: ${label ?: "unknown"}")
+                        return
                     }
+                    if (service?.openAppByPackage(packageName) != true) {
+                        _state.value = AgentState.Error("Could not open app: $packageName")
+                        return
+                    }
+
+                    graphifyRepo.logAppOpened(packageName, label ?: packageName)
                 }
 
                 Action.TAP -> {
-                    action.text?.let { text ->
-                        JarvisAccessibilityService.instance
-                            ?.tapByText(text)
+                    val text = action.text
+                    val service = JarvisAccessibilityService.instance
+                    if (text.isNullOrBlank() || service?.tapByText(text) != true) {
+                        _state.value = AgentState.Error("Could not tap: ${text ?: "missing text"}")
+                        return
                     }
                 }
 
                 Action.TYPE -> {
-                    action.value?.let { value ->
-                        JarvisAccessibilityService.instance
-                            ?.typeText(value)
+                    val value = action.value
+                    val service = JarvisAccessibilityService.instance
+                    if (value.isNullOrBlank() || service?.typeText(value) != true) {
+                        _state.value = AgentState.Error("Could not type text")
+                        return
                     }
                 }
 
                 Action.PRESS_BACK -> {
-                    JarvisAccessibilityService.instance?.pressBack()
+                    if (JarvisAccessibilityService.instance?.pressBack() != true) {
+                        _state.value = AgentState.Error("Could not press back")
+                        return
+                    }
                 }
 
                 Action.PRESS_HOME -> {
-                    JarvisAccessibilityService.instance?.pressHome()
+                    if (JarvisAccessibilityService.instance?.pressHome() != true) {
+                        _state.value = AgentState.Error("Could not press home")
+                        return
+                    }
                 }
 
                 Action.PRESS_RECENTS -> {
-                    JarvisAccessibilityService.instance?.pressRecents()
+                    if (JarvisAccessibilityService.instance?.pressRecents() != true) {
+                        _state.value = AgentState.Error("Could not open recent apps")
+                        return
+                    }
                 }
 
                 Action.AI_PROMPT -> {
