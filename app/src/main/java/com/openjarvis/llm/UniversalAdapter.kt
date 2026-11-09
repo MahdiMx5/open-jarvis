@@ -39,7 +39,7 @@ class UniversalAdapter(private val context: Context) {
                 LlamaProvider(mm.getModelPath(tier), tier.displayName)
             }
             "Custom" -> CustomProvider(baseUrl ?: "", apiKey ?: "", model ?: "")
-            else -> CustomProvider(baseUrl, apiKey, model)
+            else -> CustomProvider(baseUrl ?: "", apiKey ?: "", model ?: "")
         }
     }
     
