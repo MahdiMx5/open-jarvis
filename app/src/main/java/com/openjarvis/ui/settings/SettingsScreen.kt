@@ -31,6 +31,8 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.sp
 import com.openjarvis.llm.UniversalAdapter
 import com.openjarvis.voice.STTMode
@@ -61,7 +63,8 @@ fun SettingsScreen(
     var speakResults by remember { mutableStateOf(voiceManager.isSpeakResultsEnabled()) }
     var speechRate by remember { mutableFloatStateOf(voiceManager.getSpeechRate()) }
     var sttMode by remember { mutableStateOf(voiceManager.getSTTMode()) }
-    val sttModeLabel = if (sttMode == STTMode.PUSH_TO_TALK) "Push to Talk" else "Auto (VAD)"
+    var recognitionLanguage by remember { mutableStateOf(voiceManager.getRecognitionLanguage()) }
+    val sttModeLabel = if (sttMode == STTMode.PUSH_TO_TALK) "نگه‌داشتن میکروفون" else "تشخیص خودکار سکوت"
     
     LaunchedEffect(selectedProvider) {
         showBaseUrlField = selectedProvider == "Custom"
@@ -69,6 +72,7 @@ fun SettingsScreen(
     
     val scrollState = rememberScrollState()
     
+    androidx.compose.runtime.CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
     Box(
         modifier = modifier
             .fillMaxSize()
@@ -87,7 +91,7 @@ fun SettingsScreen(
                     .verticalScroll(scrollState)
                     .padding(horizontal = 24.dp, vertical = 16.dp)
             ) {
-                SectionLabel("AI PROVIDER")
+                SectionLabel("ارائه‌دهنده هوش مصنوعی")
                 
                 Spacer(modifier = Modifier.height(12.dp))
                 
@@ -129,7 +133,7 @@ fun SettingsScreen(
                 )
                 
                 Text(
-                    text = "Works with any OpenAI-compatible API",
+                    text = "با سرویس‌های سازگار با OpenAI کار می‌کنه",
                     style = TextStyle(
                         fontFamily = FontFamily.Default,
                         fontWeight = FontWeight(400),
@@ -153,13 +157,13 @@ fun SettingsScreen(
                 
                 Spacer(modifier = Modifier.height(32.dp))
                 
-                SectionLabel("VOICE")
+                SectionLabel("صدا و زبان")
                 
                 Spacer(modifier = Modifier.height(12.dp))
                 
                 SettingsToggleRow(
-                    title = "Voice Assistant",
-                    subtitle = "Push to Talk · VAD supported",
+                    title = "دستیار صوتی",
+                    subtitle = "با میکروفون صحبت کن؛ فارسی و انگلیسی",
                     enabled = voiceEnabled,
                     onToggle = {
                         voiceEnabled = !voiceEnabled
@@ -171,8 +175,8 @@ fun SettingsScreen(
                     Spacer(modifier = Modifier.height(8.dp))
                     
                     SettingsToggleRow(
-                        title = "Speak Results",
-                        subtitle = "Jarvis reads results aloud",
+                        title = "پاسخ صوتی",
+                        subtitle = "جارویس نتیجهٔ کارها رو با صدا می‌گه",
                         enabled = speakResults,
                         onToggle = {
                             speakResults = !speakResults
@@ -201,7 +205,7 @@ fun SettingsScreen(
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = "STT Mode",
+                                    text = "روش ضبط صدا",
                                     style = TextStyle(
                                         fontFamily = FontFamily.Default,
                                         fontWeight = FontWeight(500),
@@ -211,9 +215,9 @@ fun SettingsScreen(
                                 )
                                 Text(
                                     text = if (sttMode == STTMode.PUSH_TO_TALK)
-                                        "Hold mic to record, release to send"
+                                        "برای ضبط نگه دار و برای پایان رها کن"
                                     else
-                                        "Tap to record, auto-sends on silence",
+                                        "با سکوت، ضبط به‌صورت خودکار تموم می‌شه",
                                     style = TextStyle(
                                         fontFamily = FontFamily.Default,
                                         fontWeight = FontWeight(400),
@@ -237,7 +241,7 @@ fun SettingsScreen(
                     Spacer(modifier = Modifier.height(8.dp))
                     
                     Text(
-                        text = "Speech rate: ${"%.2f".format(speechRate)}x",
+                        text = "سرعت صحبت: ${"%.2f".format(speechRate)}x",
                         style = TextStyle(
                             fontFamily = FontFamily.Default,
                             fontSize = 12.sp,
@@ -252,6 +256,33 @@ fun SettingsScreen(
                         },
                         valueRange = 0.5f..2.0f
                     )
+
+                    Surface(
+                        modifier = Modifier.fillMaxWidth().clickable {
+                            recognitionLanguage = if (recognitionLanguage == "fa-IR") "en-US" else "fa-IR"
+                            voiceManager.setRecognitionLanguage(recognitionLanguage)
+                        },
+                        shape = RoundedCornerShape(16.dp),
+                        color = VoidColor.Void900,
+                        border = BorderStroke(1.dp, VoidColor.BorderSubtle)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(Modifier.weight(1f)) {
+                                Text("زبان تشخیص صدا", color = VoidColor.TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                                Text("برای فهمیدن حرف‌هات", color = VoidColor.TextDisabled, fontSize = 11.sp)
+                            }
+                            Text(
+                                if (recognitionLanguage == "fa-IR") "فارسی" else "English",
+                                color = VoidColor.Cyan,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
 
                     // Model status
                     Surface(
@@ -273,7 +304,7 @@ fun SettingsScreen(
                             Spacer(modifier = Modifier.width(12.dp))
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = "Speech Recognition",
+                                    text = "تشخیص گفتار",
                                     style = TextStyle(
                                         fontFamily = FontFamily.Default,
                                         fontWeight = FontWeight(500),
@@ -282,7 +313,7 @@ fun SettingsScreen(
                                     )
                                 )
                                 Text(
-                                    text = "Google Speech · Online",
+                                    text = "موتور گفتار نصب‌شده روی دستگاه",
                                     style = TextStyle(
                                         fontFamily = FontFamily.Default,
                                         fontWeight = FontWeight(400),
@@ -292,7 +323,7 @@ fun SettingsScreen(
                                 )
                             }
                             Text(
-                                text = "Ready",
+                                text = "آماده",
                                 style = TextStyle(
                                     fontFamily = FontFamily.Default,
                                     fontWeight = FontWeight(500),
@@ -306,25 +337,25 @@ fun SettingsScreen(
                 
                 Spacer(modifier = Modifier.height(32.dp))
                 
-                SectionLabel("PERMISSIONS")
+                SectionLabel("دسترسی‌ها")
                 
                 Spacer(modifier = Modifier.height(12.dp))
                 
                 PermissionRow(
-                    title = "Accessibility",
-                    subtitle = "Required — Tap to enable"
+                    title = "دسترسی‌پذیری",
+                    subtitle = "ضروری — برای فعال‌سازی لمس کن"
                 )
                 
                 Spacer(modifier = Modifier.height(12.dp))
                 
                 PermissionRow(
-                    title = "Overlay",
+                    title = "نمایش روی برنامه‌ها",
                     subtitle = "Required — Tap to enable"
                 )
                 
                 Spacer(modifier = Modifier.height(32.dp))
                 
-                SectionLabel("ABOUT")
+                SectionLabel("درباره برنامه")
                 
                 Spacer(modifier = Modifier.height(12.dp))
                 
@@ -343,6 +374,7 @@ fun SettingsScreen(
                 .padding(16.dp)
         )
     }
+    }
 }
 
 @Composable
@@ -357,13 +389,13 @@ private fun SettingsHeader(onNavigateBack: () -> Unit) {
         IconButton(onClick = onNavigateBack) {
             Icon(
                 imageVector = Icons.Filled.KeyboardArrowLeft,
-                contentDescription = "Back",
+                contentDescription = "بازگشت",
                 tint = VoidColor.TextSecondary
             )
         }
         
         Text(
-            text = "Settings",
+            text = "تنظیمات",
             style = TextStyle(
                 fontFamily = FontFamily.Default,
                 fontWeight = FontWeight(600),
