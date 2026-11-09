@@ -46,19 +46,31 @@ class UniversalAdapter(private val context: Context) {
         }
 
         return when (name) {
-            "Groq" -> if (apiKey.isBlank()) null else GroqProvider(apiKey, model.ifBlank { getDefaultModel(name) })
-            "Google Gemini", "gemini" -> if (apiKey.isBlank()) null else GeminiProvider(apiKey, model.ifBlank { getDefaultModel("Google Gemini") })
-            "OpenRouter" -> if (apiKey.isBlank()) null else OpenRouterProvider(apiKey, model.ifBlank { getDefaultModel(name) })
-            "Anthropic Claude" -> if (apiKey.isBlank()) null else AnthropicProvider(apiKey, model.ifBlank { getDefaultModel(name) })
-            "OpenAI" -> if (apiKey.isBlank()) null else OpenAIProvider(apiKey, model.ifBlank { getDefaultModel(name) })
-            "Ollama (Local)" -> if (baseUrl.isBlank()) null else OllamaProvider(baseUrl, model.ifBlank { getDefaultModel(name) })
+            "Groq" -> GroqProvider(apiKey, model.ifBlank { getDefaultModel(name) })
+            "Google Gemini", "gemini" -> GeminiProvider(apiKey, model.ifBlank { getDefaultModel("Google Gemini") })
+            "OpenRouter" -> OpenRouterProvider(apiKey, model.ifBlank { getDefaultModel(name) })
+            "Anthropic Claude" -> AnthropicProvider(apiKey, model.ifBlank { getDefaultModel(name) })
+            "OpenAI" -> OpenAIProvider(apiKey, model.ifBlank { getDefaultModel(name) })
+            "Ollama (Local)" -> OllamaProvider(baseUrl, model.ifBlank { getDefaultModel(name) })
             "Local (LlamaCpp)" -> {
                 val manager = getModelManager(context)
                 val tier = manager.getDownloadedTier() ?: return null
                 LlamaProvider(manager.getModelPath(tier), tier.displayName)
             }
-            "Custom" -> if (baseUrl.isBlank()) null else CustomProvider(baseUrl, apiKey, model)
+            "Custom" -> CustomProvider(baseUrl, apiKey, model)
             else -> null
+        }
+    }
+
+    fun isProviderConfigured(name: String): Boolean {
+        val suffix = name.lowercase().replace(Regex("[^a-z0-9]+"), "_")
+        val active = name == getProviderName()
+        val key = if (active) prefs.getString("provider_api_key", "") else prefs.getString("provider_${suffix}_api_key", "")
+        val url = if (active) prefs.getString("provider_base_url", "") else prefs.getString("provider_${suffix}_base_url", "")
+        return when (name) {
+            "Local (LlamaCpp)" -> getModelManager(context).getDownloadedTier() != null
+            "Ollama (Local)", "Custom" -> !url.isNullOrBlank()
+            else -> !key.isNullOrBlank()
         }
     }
 
