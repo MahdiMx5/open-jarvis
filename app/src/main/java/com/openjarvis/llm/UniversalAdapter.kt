@@ -122,7 +122,7 @@ class UniversalAdapter(private val context: Context) {
         }
         
         fun getDefaultModel(provider: String): String = when (provider) {
-            "Groq" -> "llama-3.1-70b-versatile"
+            "Groq" -> "openai/gpt-oss-20b"
             "Google Gemini" -> "gemini-1.5-flash"
             "OpenRouter" -> "meta-llama/llama-3-8b-instruct:free"
             "Anthropic Claude" -> "claude-haiku-4-20250514"
