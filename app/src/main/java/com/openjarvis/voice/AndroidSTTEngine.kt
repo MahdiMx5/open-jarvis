@@ -33,6 +33,11 @@ class AndroidSTTEngine(private val context: Context) : STTEngine {
     private var currentCallback: ((String?) -> Unit)? = null
     private var currentErrorCallback: ((String) -> Unit)? = null
     private var pendingResult: String? = null
+    @Volatile private var speechDetectedListener: (() -> Unit)? = null
+
+    override fun setSpeechDetectedListener(listener: (() -> Unit)?) {
+        speechDetectedListener = listener
+    }
     @Volatile private var recognitionLanguage: String = Locale.getDefault().toLanguageTag()
 
     fun setRecognitionLanguage(languageTag: String) {
@@ -54,7 +59,9 @@ class AndroidSTTEngine(private val context: Context) : STTEngine {
                     _isListening.value = true
                 }
 
-                override fun onBeginningOfSpeech() {}
+                override fun onBeginningOfSpeech() {
+                    speechDetectedListener?.invoke()
+                }
 
                 override fun onRmsChanged(rmsdB: Float) {
                     if (rmsdB * 100 < SILENCE_THRESHOLD) {

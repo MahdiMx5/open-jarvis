@@ -164,10 +164,12 @@ class VoiceManager(private val context: Context) {
         }
     }
 
-    fun speak(text: String) {
-        if (isSpeakResultsEnabled()) {
-            ttsEngine.speak(text)
-        }
+    fun speak(text: String, onDone: (() -> Unit)? = null) {
+        if (isSpeakResultsEnabled()) ttsEngine.speak(text, onDone) else onDone?.invoke()
+    }
+
+    fun setSpeechDetectedListener(listener: (() -> Unit)?) {
+        sttEngine.setSpeechDetectedListener(listener)
     }
 
     fun testSpeak(text: String) {

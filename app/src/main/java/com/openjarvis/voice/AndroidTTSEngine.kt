@@ -5,6 +5,7 @@ import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
 import java.util.Locale
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 
 class AndroidTTSEngine(private val context: Context) {
 
@@ -13,6 +14,7 @@ class AndroidTTSEngine(private val context: Context) {
     private var speechRate = 0.96f
     private var pitch = 1.0f
     @Volatile private var preferredLanguageTag = "fa-IR"
+    private val completionCallbacks = ConcurrentHashMap<String, () -> Unit>()
 
     init {
         tts = TextToSpeech(context) { status ->
@@ -24,14 +26,21 @@ class AndroidTTSEngine(private val context: Context) {
                 
                 tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
                     override fun onStart(utteranceId: String?) {}
-                    override fun onDone(utteranceId: String?) {}
-                    override fun onError(utteranceId: String?) {}
+                    override fun onDone(utteranceId: String?) {
+                        completionCallbacks.remove(utteranceId)?.invoke()
+                    }
+                    override fun onError(utteranceId: String?) {
+                        completionCallbacks.remove(utteranceId)?.invoke()
+                    }
+                    override fun onStop(utteranceId: String?, interrupted: Boolean) {
+                        completionCallbacks.remove(utteranceId)?.invoke()
+                    }
                 })
             }
         }
     }
 
-    fun speak(text: String) {
+    fun speak(text: String, onDone: (() -> Unit)? = null) {
         if (!isReady) return
         
         val clean = text
@@ -43,7 +52,9 @@ class AndroidTTSEngine(private val context: Context) {
         
         selectLanguageFor(clean)
         val utteranceId = "jarvis_${UUID.randomUUID()}"
-        tts?.speak(clean, TextToSpeech.QUEUE_FLUSH, null, utteranceId)
+        if (onDone != null) completionCallbacks[utteranceId] = onDone
+        val result = tts?.speak(clean, TextToSpeech.QUEUE_FLUSH, null, utteranceId)
+        if (result == TextToSpeech.ERROR) completionCallbacks.remove(utteranceId)?.invoke()
     }
 
     fun speakQueued(text: String) {
@@ -102,5 +113,6 @@ class AndroidTTSEngine(private val context: Context) {
         tts?.stop()
         tts?.shutdown()
         tts = null
+        completionCallbacks.clear()
     }
 }

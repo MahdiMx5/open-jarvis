@@ -7,6 +7,7 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
@@ -41,6 +42,10 @@ class OverlayService : Service() {
     private var wakeRestartJob: Job? = null
     private var waitingForCommand = false
     private var processingCommand = false
+    private var listeningForInterruption = false
+    private var interruptionDetected = false
+    private var interruptionStartedAt = 0L
+    private var messageNotificationId = 20
 
     private var isInitialized = false
 
@@ -49,6 +54,7 @@ class OverlayService : Service() {
 
         // Promote the service before doing database, crypto, or AI initialization.
         startForeground(NOTIFICATION_ID, createNotification(), android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE)
+        createMessageNotificationChannel()
 
         try {
             graphifyRepo = GraphifyRepository(applicationContext)
@@ -72,14 +78,14 @@ class OverlayService : Service() {
             agentCore.state.collect { state ->
                 when (state) {
                     is com.openjarvis.agent.AgentState.Done -> {
-                        voiceManager.speak(state.result)
                         processingCommand = false
-                        scheduleWakeListening(1600L)
+                        postReplyNotification(state.result)
+                        beginInterruptibleSpeech(state.result)
                     }
                     is com.openjarvis.agent.AgentState.Error -> {
-                        voiceManager.speak(state.message)
                         processingCommand = false
-                        scheduleWakeListening(1800L)
+                        postReplyNotification(state.message)
+                        beginInterruptibleSpeech(state.message)
                     }
                     else -> Unit
                 }
@@ -92,7 +98,8 @@ class OverlayService : Service() {
                     is VoiceManager.VoiceState.Result -> handleRecognizedSpeech(voiceState.text)
                     is VoiceManager.VoiceState.Error -> {
                         Log.w(TAG, "Speech recognition failed: ${voiceState.message}")
-                        if (!processingCommand) scheduleWakeListening(1800L)
+                        if (listeningForInterruption && !interruptionDetected) scheduleWakeListening(500L)
+                        else if (!processingCommand && !listeningForInterruption) scheduleWakeListening(1800L)
                     }
                     else -> Unit
                 }
@@ -123,6 +130,15 @@ class OverlayService : Service() {
         try {
             voiceManager.initialize()
             voiceManager.setVoiceEnabled(true)
+            voiceManager.setSpeechDetectedListener {
+                if (listeningForInterruption &&
+                    !interruptionDetected &&
+                    System.currentTimeMillis() - interruptionStartedAt > 900L
+                ) {
+                    interruptionDetected = true
+                    voiceManager.stopSpeaking()
+                }
+            }
             scheduleWakeListening(900L)
         } catch (error: Exception) {
             Log.e(TAG, "Voice initialization failed", error)
@@ -146,8 +162,15 @@ class OverlayService : Service() {
     }
 
     private fun handleRecognizedSpeech(spokenText: String) {
-        if (processingCommand) return
         val text = spokenText.trim()
+        if (listeningForInterruption && interruptionDetected) {
+            listeningForInterruption = false
+            interruptionDetected = false
+            voiceManager.setSpeechDetectedListener(null)
+            executeVoiceCommand(text)
+            return
+        }
+        if (processingCommand) return
         if (text.isBlank()) {
             scheduleWakeListening(700L)
             return
@@ -182,6 +205,7 @@ class OverlayService : Service() {
             scheduleWakeListening(500L)
             return
         }
+        if (openMediaSearch(command)) return
         processingCommand = true
         voiceManager.resetState()
         executeCommand(command)
@@ -200,6 +224,93 @@ class OverlayService : Service() {
             voiceManager.resetState()
             voiceManager.startListeningWithVAD()
         }
+    }
+
+    private fun beginInterruptibleSpeech(text: String) {
+        interruptionDetected = false
+        listeningForInterruption = true
+        interruptionStartedAt = System.currentTimeMillis()
+        voiceManager.speak(text) {
+            if (!interruptionDetected) {
+                listeningForInterruption = false
+                voiceManager.setSpeechDetectedListener(null)
+                voiceManager.stopListening()
+                scheduleWakeListening(450L)
+            }
+        }
+        scheduleWakeListening(1100L)
+    }
+
+    private fun openMediaSearch(command: String): Boolean {
+        val normalized = command.lowercase(Locale.ROOT)
+        val isDownload = listOf("دانلود", "download").any { normalized.contains(it) }
+        val isPlay = listOf("پخش", "بذار", "بزار", "بگذار", "play").any { normalized.contains(it) }
+        if (!isDownload && !isPlay) return false
+
+        val query = command
+            .replace(Regex("(?i)\\b(download|play)\\b"), " ")
+            .replace(Regex("دانلود(ش)?( کن)?"), " ")
+            .replace(Regex("(پخش کن|پخشش کن|بذار|بزار|بگذار|گوش بده|برام پخش کن)"), " ")
+            .replace(Regex("^(لطفاً\\s*)?(آهنگ|موزیک)\\s+"), "")
+            .replace(Regex("\\s+"), " ")
+            .trim()
+            .ifBlank { command.trim() }
+
+        val searchText = if (isDownload) "$query دانلود رسمی یا منبع مجاز" else "$query official audio"
+        val url = if (isDownload) {
+            "https://www.google.com/search?q=${Uri.encode(searchText)}"
+        } else {
+            "https://www.youtube.com/results?search_query=${Uri.encode(searchText)}"
+        }
+        return try {
+            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            if (isDownload) voiceManager.speak("نتایج منابع رسمی رو باز کردم. قبل از دانلود، مجاز بودن منبع رو بررسی کن.")
+            else voiceManager.speak("نتایج پخش رو باز کردم. آهنگ موردنظرت رو از نتیجه‌های رسمی انتخاب کن.")
+            listeningForInterruption = false
+            interruptionDetected = false
+            voiceManager.setSpeechDetectedListener(null)
+            true
+        } catch (error: Exception) {
+            Log.e(TAG, "Unable to open media search", error)
+            voiceManager.speak("نتونستم صفحهٔ جست‌وجو رو باز کنم.")
+            false
+        }
+    }
+
+    private fun createMessageNotificationChannel() {
+        val channel = NotificationChannel(
+            MESSAGE_CHANNEL_ID,
+            "پیام‌های جارویس",
+            NotificationManager.IMPORTANCE_HIGH
+        ).apply {
+            description = "اعلان پاسخ‌های گفت‌وگوی جارویس"
+            enableVibration(true)
+        }
+        getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
+    }
+
+    private fun postReplyNotification(message: String) {
+        val pendingIntent = PendingIntent.getActivity(
+            this, 1, Intent(this, MainActivity::class.java),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        val notification = NotificationCompat.Builder(this, MESSAGE_CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle("جارویس")
+            .setContentText(message.take(180))
+            .setStyle(
+                NotificationCompat.MessagingStyle("جارویس")
+                    .addMessage(message.take(3000), System.currentTimeMillis(), "جارویس")
+                    .setConversationTitle("گفت‌وگو با جارویس")
+            )
+            .setCategory(NotificationCompat.CATEGORY_MESSAGE)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setAutoCancel(true)
+            .setContentIntent(pendingIntent)
+            .build()
+        runCatching {
+            getSystemService(NotificationManager::class.java).notify(messageNotificationId++, notification)
+        }.onFailure { Log.w(TAG, "Unable to show reply notification", it) }
     }
 
     private fun createNotification(): Notification {
@@ -252,6 +363,7 @@ class OverlayService : Service() {
     companion object {
         private const val TAG = "OpenJarvisOverlay"
         private const val CHANNEL_ID = "jarvis_voice_channel"
+        private const val MESSAGE_CHANNEL_ID = "jarvis_messages"
         private const val NOTIFICATION_ID = 1
 
         fun start(context: Context) {
