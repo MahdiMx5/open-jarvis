@@ -210,6 +210,7 @@ fun SettingsScreen(
                         onToggle = {
                             speakResults = !speakResults
                             voiceManager.setSpeakResultsEnabled(speakResults)
+                            OverlayService.refreshRuntimeSettings(context)
                         }
                     )
                     
@@ -228,6 +229,7 @@ fun SettingsScreen(
                                 .clickable { 
                                     sttMode = if (sttMode == STTMode.PUSH_TO_TALK) STTMode.AUTO_VAD else STTMode.PUSH_TO_TALK
                                     voiceManager.setSTTMode(sttMode)
+                                    OverlayService.refreshRuntimeSettings(context)
                                 }
                                 .padding(16.dp),
                             verticalAlignment = Alignment.CenterVertically
@@ -282,6 +284,7 @@ fun SettingsScreen(
                         onValueChange = {
                             speechRate = it
                             voiceManager.setSpeechRate(it)
+                            OverlayService.refreshRuntimeSettings(context)
                         },
                         valueRange = 0.5f..2.0f
                     )
@@ -350,6 +353,7 @@ fun SettingsScreen(
                                         onClick = {
                                             recognitionLanguage = tag
                                             voiceManager.setRecognitionLanguage(tag)
+                                            OverlayService.refreshRuntimeSettings(context)
                                             showLanguageMenu = false
                                         }
                                     )
