@@ -20,7 +20,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.lifecycle.LifecycleService
-import androidx.lifecycle.ViewTreeLifecycleOwner
+import androidx.lifecycle.setViewTreeLifecycleOwner
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -154,7 +154,7 @@ class OverlayService : LifecycleService() {
             val manager = getSystemService(WINDOW_SERVICE) as WindowManager
             val view = ComposeView(this).apply {
                 setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindow)
-                ViewTreeLifecycleOwner.set(this, this@OverlayService)
+                setViewTreeLifecycleOwner(this@OverlayService)
                 setContent {
                     OpenJarvisTheme {
                         val state by agentCore.state.collectAsState()
