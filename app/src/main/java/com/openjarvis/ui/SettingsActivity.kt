@@ -12,6 +12,7 @@ import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import com.openjarvis.R
 import com.openjarvis.llm.UniversalAdapter
+import com.openjarvis.ui.settings.ProviderFormSettings
 import com.openjarvis.ui.settings.SettingsScreen
 import com.openjarvis.ui.theme.OpenJarvisTheme
 import com.openjarvis.voice.VoiceManager
@@ -47,6 +48,17 @@ class SettingsActivity : ComponentActivity() {
                     onNavigateBack = { finish() },
                     onSaveProvider = { name, baseUrl, apiKey, model ->
                         saveProviderSettings(name, baseUrl, apiKey, model)
+                    },
+                    onLoadProvider = { name ->
+                        val providerKey = name.lowercase().replace(Regex("[^a-z0-9]+"), "_")
+                        ProviderFormSettings(
+                            baseUrl = prefs.getString("provider_${providerKey}_base_url", "") ?: "",
+                            apiKey = prefs.getString("provider_${providerKey}_api_key", "") ?: "",
+                            model = prefs.getString(
+                                "provider_${providerKey}_model",
+                                UniversalAdapter.getDefaultModel(name)
+                            ) ?: UniversalAdapter.getDefaultModel(name)
+                        )
                     },
                     onTestConnection = {
                         UniversalAdapter(applicationContext).testConnection()
