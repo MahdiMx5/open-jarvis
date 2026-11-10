@@ -28,7 +28,7 @@
         tools:targetApi="34">
 
         <activity
-            android:name=".ui.MainActivity"
+            android:name=".ui.auth.AuthActivity"
             android:exported="true"
             android:theme="@style/Theme.OpenJarvis">
             <intent-filter>
@@ -36,6 +36,11 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <activity
+            android:name=".ui.MainActivity"
+            android:exported="false"
+            android:theme="@style/Theme.OpenJarvis" />
 
         <activity
             android:name=".ui.SettingsActivity"
@@ -87,5 +92,4 @@
             android:foregroundServiceType="dataSync" />
 
     </application>
-
 </manifest>
