@@ -48,6 +48,7 @@ import com.openjarvis.llm.UniversalAdapter
 import com.openjarvis.voice.STTMode
 import com.openjarvis.voice.VoiceManager
 import com.openjarvis.ui.theme.VoidColor
+import com.openjarvis.ui.OverlayService
 
 data class ProviderFormSettings(
     val baseUrl: String,
@@ -195,6 +196,7 @@ fun SettingsScreen(
                     onToggle = {
                         voiceEnabled = !voiceEnabled
                         voiceManager.setVoiceEnabled(voiceEnabled)
+                        OverlayService.syncVoicePreference(context, voiceEnabled)
                     }
                 )
                 
