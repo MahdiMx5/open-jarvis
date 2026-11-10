@@ -58,7 +58,7 @@ class OverlayService : LifecycleService() {
     private lateinit var socketServer: SocketServer
     private var stateCollectJob: Job? = null
     private var voiceCollectJob: Job? = null
-    private var recentTasks by mutableStateOf(emptyList<TaskNode>())
+    private var recentTaskItems by mutableStateOf(emptyList<TaskNode>())
     private var overlayView: ComposeView? = null
     private var windowManager: WindowManager? = null
     private var wakeRestartJob: Job? = null
@@ -135,7 +135,7 @@ class OverlayService : LifecycleService() {
 
         CoroutineScope(Dispatchers.IO).launch {
             runCatching {
-                recentTasks = graphifyRepo.getRecentTasks(10)
+                recentTaskItems = graphifyRepo.getRecentTasks(10)
             }.onFailure {
                 Log.e(TAG, "Unable to load recent tasks", it)
             }
@@ -165,7 +165,7 @@ class OverlayService : LifecycleService() {
                             FloatingOverlayWidget(
                                 agentState = state,
                                 voiceManager = voiceManager,
-                                recentTasks = recentTasks,
+                                recentTaskItems = recentTaskItems,
                                 onCommand = { command -> executeCommand(command) },
                                 onCollapse = {}
                             )
@@ -504,7 +504,7 @@ class OverlayService : LifecycleService() {
 
     fun getAgentCore() = agentCore
     fun getVoiceManager() = voiceManager
-    fun getRecentTasks() = recentTasks
+    fun getRecentTasks() = recentTaskItems
 
     fun executeCommand(command: String) {
         if (!::agentCore.isInitialized || !::graphifyRepo.isInitialized) return
@@ -514,7 +514,7 @@ class OverlayService : LifecycleService() {
         CoroutineScope(Dispatchers.IO).launch {
             delay(1000)
             runCatching {
-                recentTasks = graphifyRepo.getRecentTasks(10)
+                recentTaskItems = graphifyRepo.getRecentTasks(10)
             }.onFailure {
                 Log.e(TAG, "Unable to refresh recent tasks", it)
             }
