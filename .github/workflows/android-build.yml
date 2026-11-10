@@ -1,9 +1,11 @@
-﻿name: Android APK Build
+name: Android APK Build
 
 on:
   push:
     branches: ["main", "fix/kotlin-build-errors"]
   workflow_dispatch:
+  pull_request:
+    branches: ["main"]
 
 permissions:
   contents: read
