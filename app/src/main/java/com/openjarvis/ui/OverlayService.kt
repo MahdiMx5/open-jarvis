@@ -4,7 +4,23 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
-import android.app.Service
+import android.view.Gravity
+import android.view.WindowManager
+import android.graphics.PixelFormat
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.platform.ViewCompositionStrategy
+import androidx.lifecycle.LifecycleService
+import androidx.lifecycle.ViewTreeLifecycleOwner
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -18,6 +34,8 @@ import com.openjarvis.graphify.GraphifyRepository
 import com.openjarvis.local.MusicDownloadManager
 import com.openjarvis.graphify.nodes.TaskNode
 import com.openjarvis.ui.chat.ChatStorage
+import com.openjarvis.ui.overlay.FloatingOverlayWidget
+import com.openjarvis.ui.theme.OpenJarvisTheme
 import com.openjarvis.voice.VoiceManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -30,7 +48,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.collect
 import java.util.Locale
 
-class OverlayService : Service() {
+class OverlayService : LifecycleService() {
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
@@ -40,7 +58,9 @@ class OverlayService : Service() {
     private lateinit var socketServer: SocketServer
     private var stateCollectJob: Job? = null
     private var voiceCollectJob: Job? = null
-    private var recentTasks = emptyList<TaskNode>()
+    private var recentTasks by mutableStateOf(emptyList<TaskNode>())
+    private var overlayView: ComposeView? = null
+    private var windowManager: WindowManager? = null
     private var wakeRestartJob: Job? = null
     private var waitingForCommand = false
     private var processingCommand = false
@@ -57,6 +77,7 @@ class OverlayService : Service() {
         // Promote the service before doing database, crypto, or AI initialization.
         startForeground(NOTIFICATION_ID, createNotification(), android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE)
         createMessageNotificationChannel()
+        attachFloatingOverlay()
 
         try {
             graphifyRepo = GraphifyRepository(applicationContext)
@@ -119,6 +140,56 @@ class OverlayService : Service() {
         }
     }
 
+    private fun attachFloatingOverlay() {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M &&
+            !android.provider.Settings.canDrawOverlays(this)
+        ) {
+            Log.w(TAG, "Overlay permission is not granted; floating window was not attached")
+            return
+        }
+
+        try {
+            val manager = getSystemService(WINDOW_SERVICE) as WindowManager
+            val view = ComposeView(this).apply {
+                setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindow)
+                ViewTreeLifecycleOwner.set(this, this@OverlayService)
+                setContent {
+                    OpenJarvisTheme {
+                        val state by agentCore.state.collectAsState()
+                        Box(
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 12.dp),
+                            contentAlignment = Alignment.TopEnd
+                        ) {
+                            FloatingOverlayWidget(
+                                agentState = state,
+                                voiceManager = voiceManager,
+                                recentTasks = recentTasks,
+                                onCommand = { command -> executeCommand(command) },
+                                onCollapse = {}
+                            )
+                        }
+                    }
+                }
+            }
+            val params = WindowManager.LayoutParams(
+                WindowManager.LayoutParams.MATCH_PARENT,
+                WindowManager.LayoutParams.WRAP_CONTENT,
+                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
+                    WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+                PixelFormat.TRANSLUCENT
+            ).apply {
+                gravity = Gravity.TOP or Gravity.END
+                y = (72 * resources.displayMetrics.density).toInt()
+            }
+            manager.addView(view, params)
+            windowManager = manager
+            overlayView = view
+        } catch (error: Exception) {
+            Log.e(TAG, "Unable to attach floating overlay window", error)
+        }
+    }
+
     private suspend fun initializeServices() {
         if (isInitialized) return
         isInitialized = true
@@ -160,6 +231,11 @@ class OverlayService : Service() {
         voiceCollectJob?.cancel()
         wakeRestartJob?.cancel()
         serviceScope.cancel()
+        overlayView?.let { view ->
+            runCatching { windowManager?.removeView(view) }
+                .onFailure { Log.w(TAG, "Unable to remove floating overlay", it) }
+            overlayView = null
+        }
         if (::socketServer.isInitialized) socketServer.stop()
         if (::voiceManager.isInitialized) voiceManager.release()
         super.onDestroy()
