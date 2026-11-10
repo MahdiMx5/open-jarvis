@@ -33,6 +33,14 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import android.content.Intent
+import android.net.Uri
+import android.provider.Settings
+import com.openjarvis.BuildConfig
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.sp
 import com.openjarvis.llm.UniversalAdapter
@@ -403,15 +411,10 @@ fun SettingsScreen(
                 
                 Spacer(modifier = Modifier.height(12.dp))
                 
-                PermissionRow(
-                    title = "دسترسی‌پذیری",
-                    subtitle = "ضروری — برای فعال‌سازی لمس کن"
-                )
-                
-                Spacer(modifier = Modifier.height(12.dp))
-                
+                PermissionStatusRows()
+
                 Spacer(modifier = Modifier.height(32.dp))
-                
+
                 SectionLabel("درباره برنامه")
                 
                 Spacer(modifier = Modifier.height(12.dp))
@@ -854,16 +857,71 @@ private fun SettingsToggleRow(
 }
 
 @Composable
+private fun PermissionStatusRows() {
+    val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+    var refreshKey by remember { mutableIntStateOf(0) }
+
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) refreshKey++
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    val overlayGranted = remember(refreshKey) {
+        Settings.canDrawOverlays(context)
+    }
+    val accessibilityGranted = remember(refreshKey) {
+        val enabled = Settings.Secure.getString(
+            context.contentResolver,
+            Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
+        ).orEmpty()
+        enabled.split(':').any {
+            it.contains("com.openjarvis.accessibility.JarvisAccessibilityService", ignoreCase = true)
+        }
+    }
+
+    PermissionRow(
+        title = "دسترسی‌پذیری",
+        subtitle = if (accessibilityGranted) "فعال است" else "برای کنترل برنامه‌ها لازم است — لمس کن",
+        isGranted = accessibilityGranted,
+        onClick = {
+            context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+        }
+    )
+
+    Spacer(modifier = Modifier.height(12.dp))
+
+    PermissionRow(
+        title = "نمایش روی برنامه‌ها",
+        subtitle = if (overlayGranted) "فعال است" else "برای پنجره شناور لازم است — لمس کن",
+        isGranted = overlayGranted,
+        onClick = {
+            val intent = Intent(
+                Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                Uri.parse("package:${context.packageName}")
+            )
+            context.startActivity(intent)
+        }
+    )
+}
+
+@Composable
 private fun PermissionRow(
     title: String,
-    subtitle: String
+    subtitle: String,
+    isGranted: Boolean,
+    onClick: () -> Unit
 ) {
-    val isGranted by remember { mutableStateOf(false) }
-    
+    val statusColor = if (isGranted) VoidColor.Green else VoidColor.Red
+
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .height(64.dp),
+            .height(64.dp)
+            .clickable(onClick = onClick),
         shape = RoundedCornerShape(16.dp),
         color = VoidColor.Void900,
         border = BorderStroke(1.dp, VoidColor.BorderSubtle)
@@ -878,19 +936,19 @@ private fun PermissionRow(
                 modifier = Modifier
                     .size(36.dp)
                     .clip(RoundedCornerShape(8.dp))
-                    .background(VoidColor.Red.copy(alpha = 0.12f)),
+                    .background(statusColor.copy(alpha = 0.12f)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = Icons.Default.Check,
                     contentDescription = null,
-                    tint = VoidColor.Red,
+                    tint = statusColor,
                     modifier = Modifier.size(20.dp)
                 )
             }
-            
+
             Spacer(modifier = Modifier.width(16.dp))
-            
+
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = title,
@@ -907,15 +965,15 @@ private fun PermissionRow(
                         fontFamily = FontFamily.Default,
                         fontWeight = FontWeight(400),
                         fontSize = 11.sp,
-                        color = VoidColor.Red
+                        color = statusColor
                     )
                 )
             }
-            
+
             Icon(
                 imageVector = Icons.Filled.KeyboardArrowRight,
                 contentDescription = null,
-                tint = VoidColor.Red
+                tint = statusColor
             )
         }
     }
@@ -930,11 +988,11 @@ private fun AboutSection() {
         border = BorderStroke(1.dp, VoidColor.BorderSubtle)
     ) {
         Column {
-            AboutRow(title = "Version", value = "M1.0 (build 1)")
+            AboutRow(title = "Version", value = "${BuildConfig.VERSION_NAME} (build ${BuildConfig.VERSION_CODE})")
             Divider(thickness = 1.dp, color = VoidColor.BorderSubtle)
             AboutRow(title = "License", value = "MIT Open Source")
             Divider(thickness = 1.dp, color = VoidColor.BorderSubtle)
-            AboutRow(title = "GitHub", value = "tokenarc/open-jarvis", isLink = true)
+            AboutRow(title = "GitHub", value = "MahdiMx5/open-jarvis", isLink = true)
             Divider(thickness = 1.dp, color = VoidColor.BorderSubtle)
             
             Text(
