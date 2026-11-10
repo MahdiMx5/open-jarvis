@@ -16,6 +16,7 @@ import com.openjarvis.agent.AgentCore
 import com.openjarvis.bridge.SocketServer
 import com.openjarvis.graphify.GraphifyRepository
 import com.openjarvis.graphify.nodes.TaskNode
+import com.openjarvis.ui.chat.ChatStorage
 import com.openjarvis.voice.VoiceManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -46,6 +47,7 @@ class OverlayService : Service() {
     private var interruptionDetected = false
     private var interruptionStartedAt = 0L
     private var messageNotificationId = 20
+    private var currentChatThreadId: String? = null
 
     private var isInitialized = false
 
@@ -55,6 +57,7 @@ class OverlayService : Service() {
         // Promote the service before doing database, crypto, or AI initialization.
         startForeground(NOTIFICATION_ID, createNotification(), android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE)
         createMessageNotificationChannel()
+        currentChatThreadId = ChatStorage.currentThreadId(this)
 
         try {
             graphifyRepo = GraphifyRepository(applicationContext)
@@ -79,11 +82,13 @@ class OverlayService : Service() {
                 when (state) {
                     is com.openjarvis.agent.AgentState.Done -> {
                         processingCommand = false
+                        recordChatMessage("assistant", state.result)
                         postReplyNotification(state.result)
                         beginInterruptibleSpeech(state.result)
                     }
                     is com.openjarvis.agent.AgentState.Error -> {
                         processingCommand = false
+                        recordChatMessage("assistant", state.message)
                         postReplyNotification(state.message)
                         beginInterruptibleSpeech(state.message)
                     }
@@ -205,6 +210,7 @@ class OverlayService : Service() {
             scheduleWakeListening(500L)
             return
         }
+        recordChatMessage("user", command)
         if (openMediaSearch(command)) return
         processingCommand = true
         voiceManager.resetState()
@@ -224,6 +230,13 @@ class OverlayService : Service() {
             voiceManager.resetState()
             voiceManager.startListeningWithVAD()
         }
+    }
+
+    private fun recordChatMessage(role: String, text: String) {
+        runCatching {
+            val thread = ChatStorage.appendMessage(this, currentChatThreadId, role, text)
+            currentChatThreadId = thread.id
+        }.onFailure { Log.w(TAG, "Unable to store voice conversation", it) }
     }
 
     private fun beginInterruptibleSpeech(text: String) {
@@ -264,8 +277,13 @@ class OverlayService : Service() {
         }
         return try {
             startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-            if (isDownload) voiceManager.speak("نتایج منابع رسمی رو باز کردم. قبل از دانلود، مجاز بودن منبع رو بررسی کن.")
-            else voiceManager.speak("نتایج پخش رو باز کردم. آهنگ موردنظرت رو از نتیجه‌های رسمی انتخاب کن.")
+            val response = if (isDownload) {
+                "نتایج منابع رسمی رو باز کردم. قبل از دانلود، مجاز بودن منبع رو بررسی کن."
+            } else {
+                "نتایج پخش رو باز کردم. آهنگ موردنظرت رو از نتیجه‌های رسمی انتخاب کن."
+            }
+            recordChatMessage("assistant", response)
+            voiceManager.speak(response)
             listeningForInterruption = false
             interruptionDetected = false
             voiceManager.setSpeechDetectedListener(null)
