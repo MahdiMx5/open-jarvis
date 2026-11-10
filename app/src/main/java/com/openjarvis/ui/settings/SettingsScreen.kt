@@ -883,6 +883,10 @@ private fun PermissionStatusRows() {
         }
     }
 
+    val overlayGranted = remember(refreshKey) {
+        Settings.canDrawOverlays(context)
+    }
+
     PermissionRow(
         title = "دسترسی‌پذیری",
         subtitle = if (accessibilityGranted) "فعال است" else "برای کنترل برنامه‌ها لازم است — لمس کن",
@@ -894,11 +898,18 @@ private fun PermissionStatusRows() {
 
     Spacer(modifier = Modifier.height(12.dp))
 
-    Text(
-        text = "پنجره شناور مستقل در این نسخه هنوز به سرویس اندروید متصل نشده است.",
-        color = VoidColor.TextDisabled,
-        fontSize = 11.sp,
-        modifier = Modifier.padding(horizontal = 4.dp)
+    PermissionRow(
+        title = "نمایش روی برنامه‌ها",
+        subtitle = if (overlayGranted) "فعال است" else "برای پنجره شناور لازم است — لمس کن",
+        isGranted = overlayGranted,
+        onClick = {
+            context.startActivity(
+                Intent(
+                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                    Uri.parse("package:${context.packageName}")
+                )
+            )
+        }
     )
 }
 
