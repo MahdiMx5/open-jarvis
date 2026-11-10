@@ -103,7 +103,8 @@ class UniversalAdapter(private val context: Context) {
             "Anthropic Claude",
             "OpenAI",
             "Ollama (Local)",
-            "Local (LlamaCpp)"
+            "Local (LlamaCpp)",
+            "Custom"
         )
         
         fun getModelManager(context: Context): ModelManager {
