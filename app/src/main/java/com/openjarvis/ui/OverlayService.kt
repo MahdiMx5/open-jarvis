@@ -15,6 +15,7 @@ import com.openjarvis.R
 import com.openjarvis.agent.AgentCore
 import com.openjarvis.bridge.SocketServer
 import com.openjarvis.graphify.GraphifyRepository
+import com.openjarvis.local.MusicDownloadManager
 import com.openjarvis.graphify.nodes.TaskNode
 import com.openjarvis.ui.chat.ChatStorage
 import com.openjarvis.voice.VoiceManager
@@ -262,24 +263,39 @@ class OverlayService : Service() {
             .replace(Regex("(?i)\\b(download|play)\\b"), " ")
             .replace(Regex("دانلود(ش)?( کن)?"), " ")
             .replace(Regex("(پخش کن|پخشش کن|بذار|بزار|بگذار|گوش بده|برام پخش کن)"), " ")
-            .replace(Regex("^(لطفاً\\s*)?(آهنگ|موزیک)\\s+"), "")
+            .replace(Regex("^(لطفاً\\s*)?(این\\s+)?(آهنگ|موزیک)\\s+"), "")
             .replace(Regex("\\s+"), " ")
             .trim()
             .ifBlank { command.trim() }
 
-        val searchText = if (isDownload) "$query دانلود رسمی یا منبع مجاز" else "$query official audio"
-        val url = if (isDownload) {
-            "https://www.google.com/search?q=${Uri.encode(searchText)}"
-        } else {
-            "https://www.youtube.com/results?search_query=${Uri.encode(searchText)}"
+        if (isDownload) {
+            processingCommand = true
+            serviceScope.launch {
+                val result = MusicDownloadManager.download(this@OverlayService, query)
+                val response = result.fold(
+                    onSuccess = { downloaded ->
+                        if (downloaded.alreadyPresent) {
+                            "«${downloaded.title}» از قبل در فهرست آهنگ‌های گوشی وجود دارد؛ دوباره دانلود نکردم."
+                        } else {
+                            "دانلود «${downloaded.title}» شروع شد. فایل در پوشهٔ Music/Jarvis ذخیره می‌شود."
+                        }
+                    },
+                    onFailure = { error ->
+                        error.message ?: "دانلود آهنگ انجام نشد."
+                    }
+                )
+                processingCommand = false
+                recordChatMessage("assistant", response)
+                postReplyNotification(response)
+                beginInterruptibleSpeech(response)
+            }
+            return true
         }
+
+        val url = "https://www.youtube.com/results?search_query=${Uri.encode("$query official audio")}"
         return try {
             startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-            val response = if (isDownload) {
-                "نتایج منابع رسمی رو باز کردم. قبل از دانلود، مجاز بودن منبع رو بررسی کن."
-            } else {
-                "نتایج پخش رو باز کردم. آهنگ موردنظرت رو از نتیجه‌های رسمی انتخاب کن."
-            }
+            val response = "نتایج پخش رو باز کردم. آهنگ موردنظرت رو از نتیجه‌های رسمی انتخاب کن."
             recordChatMessage("assistant", response)
             voiceManager.speak(response)
             listeningForInterruption = false
