@@ -145,10 +145,10 @@ class VoiceManager(private val context: Context) {
         }
 
         scope.launch {
+            // Android SpeechRecognizer performs its own end-of-speech detection.
+            // This is not a continuous microphone VAD implementation.
             _state.value = VoiceState.Recording
-            _state.value = VoiceState.Transcribing
 
-            // For now, use simple push-to-talk with Android's built-in VAD
             sttEngine.startListening(
                 onResult = { text ->
                     if (!text.isNullOrBlank()) {
