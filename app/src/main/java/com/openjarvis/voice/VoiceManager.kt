@@ -58,7 +58,18 @@ class VoiceManager(private val context: Context) {
         ttsEngine.setPreferredLanguage(getRecognitionLanguage())
     }
 
-    fun initialize() { ttsEngine.setSpeechRate(getSpeechRate()) }
+    fun initialize() { reloadSettings() }
+
+    /**
+     * Re-apply persisted voice preferences to the live engines.
+     * SettingsActivity and OverlayService own separate VoiceManager instances,
+     * so writing SharedPreferences alone does not update the running engines.
+     */
+    fun reloadSettings() {
+        ttsEngine.setSpeechRate(getSpeechRate())
+        sttEngine.setRecognitionLanguage(getRecognitionLanguage())
+        ttsEngine.setPreferredLanguage(getRecognitionLanguage())
+    }
 
     fun isVoiceEnabled(): Boolean = prefs.getBoolean(KEY_VOICE_ENABLED, false)
 
