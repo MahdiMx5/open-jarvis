@@ -5,6 +5,8 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.net.Uri
+import android.provider.Settings
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -18,6 +20,7 @@ import com.openjarvis.ui.theme.OpenJarvisTheme
 
 class MainActivity : ComponentActivity() {
     private lateinit var graphifyRepo: GraphifyRepository
+    private var waitingForOverlayPermission = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -50,7 +53,33 @@ class MainActivity : ComponentActivity() {
             ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.RECORD_AUDIO), AUDIO_PERMISSION_REQUEST)
             return
         }
+        ensureOverlayPermission()
+    }
+
+    private fun ensureOverlayPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) {
+            waitingForOverlayPermission = true
+            val intent = Intent(
+                Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                Uri.parse("package:$packageName")
+            )
+            startActivity(intent)
+            Toast.makeText(this, "برای نمایش پنجره شناور، اجازه نمایش روی برنامه‌ها را فعال کن.", Toast.LENGTH_LONG).show()
+            return
+        }
         startVoiceService()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (waitingForOverlayPermission) {
+            waitingForOverlayPermission = false
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M || Settings.canDrawOverlays(this)) {
+                startVoiceService()
+            } else {
+                Toast.makeText(this, "بدون این مجوز، پنجره شناور فعال نمی‌شود.", Toast.LENGTH_LONG).show()
+            }
+        }
     }
 
     private fun startVoiceService() {
@@ -67,7 +96,7 @@ class MainActivity : ComponentActivity() {
         when (requestCode) {
             NOTIFICATION_PERMISSION_REQUEST -> ensureMicrophonePermission()
             AUDIO_PERMISSION_REQUEST -> {
-                if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) startVoiceService()
+                if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) ensureOverlayPermission()
                 else Toast.makeText(this, "برای فرمان صوتی، اجازهٔ میکروفون لازم است.", Toast.LENGTH_LONG).show()
             }
         }
