@@ -47,7 +47,6 @@ class OverlayService : Service() {
     private var interruptionDetected = false
     private var interruptionStartedAt = 0L
     private var messageNotificationId = 20
-    private var currentChatThreadId: String? = null
 
     private var isInitialized = false
 
@@ -57,7 +56,6 @@ class OverlayService : Service() {
         // Promote the service before doing database, crypto, or AI initialization.
         startForeground(NOTIFICATION_ID, createNotification(), android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE)
         createMessageNotificationChannel()
-        currentChatThreadId = ChatStorage.currentThreadId(this)
 
         try {
             graphifyRepo = GraphifyRepository(applicationContext)
@@ -234,8 +232,8 @@ class OverlayService : Service() {
 
     private fun recordChatMessage(role: String, text: String) {
         runCatching {
-            val thread = ChatStorage.appendMessage(this, currentChatThreadId, role, text)
-            currentChatThreadId = thread.id
+            val activeThreadId = ChatStorage.currentThreadId(this)
+            ChatStorage.appendMessage(this, activeThreadId, role, text)
         }.onFailure { Log.w(TAG, "Unable to store voice conversation", it) }
     }
 
