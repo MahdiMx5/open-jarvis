@@ -83,12 +83,22 @@ class GroqProvider(
                     val reason = when (response.code) {
                         401 -> "Groq API key is invalid or expired"
                         403 -> "Groq rejected this key or its permissions"
-                        404 -> "Groq API endpoint or model was not found"
+                        404 -> "Groq API endpoint was not found"
                         429 -> "Groq rate limit or quota reached"
                         in 500..599 -> "Groq service is temporarily unavailable"
                         else -> providerMessage.ifBlank { "Groq connection failed" }
                     }
                     throw Exception("$reason (HTTP ${response.code})")
+                }
+
+                val availableModels = JSONObject(responseBody).optJSONArray("data")
+                val modelAvailable = availableModels?.let { models ->
+                    (0 until models.length()).any { index ->
+                        models.optJSONObject(index)?.optString("id") == model
+                    }
+                } ?: false
+                if (!modelAvailable) {
+                    throw Exception("API key is valid, but model '$model' is not available for this account")
                 }
             }
             System.currentTimeMillis() - startTime
