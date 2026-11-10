@@ -165,7 +165,7 @@ class OverlayService : LifecycleService() {
                             FloatingOverlayWidget(
                                 agentState = state,
                                 voiceManager = voiceManager,
-                                recentTaskItems = recentTaskItems,
+                                recentTasks = recentTaskItems,
                                 onCommand = { command -> executeCommand(command) },
                                 onCollapse = {}
                             )
