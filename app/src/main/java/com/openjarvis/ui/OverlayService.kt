@@ -77,7 +77,6 @@ class OverlayService : LifecycleService() {
         // Promote the service before doing database, crypto, or AI initialization.
         startForeground(NOTIFICATION_ID, createNotification(), android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE)
         createMessageNotificationChannel()
-        attachFloatingOverlay()
 
         try {
             graphifyRepo = GraphifyRepository(applicationContext)
@@ -90,6 +89,8 @@ class OverlayService : LifecycleService() {
             stopSelf()
             return
         }
+
+        attachFloatingOverlay()
 
         CoroutineScope(Dispatchers.Main).launch {
             initializeServices()
@@ -204,7 +205,6 @@ class OverlayService : LifecycleService() {
 
         try {
             voiceManager.initialize()
-            voiceManager.setVoiceEnabled(true)
             voiceManager.setSpeechDetectedListener {
                 if (listeningForInterruption &&
                     !interruptionDetected &&
@@ -222,6 +222,14 @@ class OverlayService : LifecycleService() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         super.onStartCommand(intent, flags, startId)
+        if (intent?.action == ACTION_STOP) {
+            if (::voiceManager.isInitialized) {
+                voiceManager.stopListening()
+                voiceManager.stopSpeaking()
+            }
+            stopForeground(STOP_FOREGROUND_REMOVE)
+            stopSelf()
+        }
         return START_NOT_STICKY
     }
 
@@ -298,6 +306,7 @@ class OverlayService : LifecycleService() {
         wakeRestartJob = serviceScope.launch {
             delay(delayMs)
             if (!isInitialized || processingCommand || !::voiceManager.isInitialized) return@launch
+            if (!voiceManager.isVoiceEnabled()) return@launch
             if (androidx.core.content.ContextCompat.checkSelfPermission(
                     this@OverlayService,
                     android.Manifest.permission.RECORD_AUDIO
@@ -443,11 +452,23 @@ class OverlayService : LifecycleService() {
             PendingIntent.FLAG_IMMUTABLE
         )
 
+        val stopIntent = PendingIntent.getService(
+            this,
+            2,
+            Intent(this, OverlayService::class.java).setAction(ACTION_STOP),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle(getString(R.string.notification_title))
-            .setContentText("جارویس فعال است و منتظر فرمان صوتی است")
+            .setContentText("جارویس فعال است؛ برای خاموش‌کردن میکروفون توقف را بزن")
             .setSmallIcon(R.drawable.ic_notification)
             .setContentIntent(pendingIntent)
+            .addAction(
+                R.drawable.ic_notification,
+                "توقف و خاموش‌کردن میکروفون",
+                stopIntent
+            )
             .setOngoing(true)
             .build()
     }
@@ -476,6 +497,7 @@ class OverlayService : LifecycleService() {
         private const val CHANNEL_ID = "jarvis_voice_channel"
         private const val MESSAGE_CHANNEL_ID = "jarvis_messages"
         private const val NOTIFICATION_ID = 1
+        private const val ACTION_STOP = "com.openjarvis.action.STOP_ASSISTANT"
 
         fun start(context: Context) {
             val intent = Intent(context, OverlayService::class.java)
