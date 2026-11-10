@@ -68,9 +68,9 @@ jobs:
           values.mkdir(parents=True, exist_ok=True)
           output = values / "google_auth_client.xml"
           output.write_text(
-              '<?xml version="1.0" encoding="utf-8"?>\\n<resources>\\n'
-              f'    <string name="default_web_client_id" translatable="false">{escape(web_client)}</string>\\n'
-              '</resources>\\n',
+              '<?xml version="1.0" encoding="utf-8"?>\n<resources>\n'
+              f'    <string name="default_web_client_id" translatable="false">{escape(web_client)}</string>\n'
+              '</resources>\n',
               encoding="utf-8"
           )
           print("Google Sign-In Web client ID configured.")
