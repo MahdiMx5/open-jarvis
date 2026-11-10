@@ -74,7 +74,6 @@ fun SettingsScreen(
     }
     
     val scrollState = rememberScrollState()
-    val coroutineScope = rememberCoroutineScope()
     
     androidx.compose.runtime.CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
     Box(
@@ -153,18 +152,12 @@ fun SettingsScreen(
                     apiKey = apiKey,
                     baseUrl = baseUrl,
                     model = model,
-                    onTest = {
-                        onSaveProvider(selectedProvider, baseUrl, apiKey, model)
+                    onSave = { name, url, key, mdl ->
+                        onSaveProvider(name, url, key, mdl)
                         lastSaved = System.currentTimeMillis()
                         savedVisible = true
-                        coroutineScope.launch {
-                            testState = TestState.Loading
-                            testState = onTestConnection().fold(
-                                onSuccess = { TestState.Success(it) },
-                                onFailure = { TestState.Error(it.message ?: "Connection failed") }
-                            )
-                        }
-                    }
+                    },
+                    onTest = onTestConnection
                 )
                 
                 Spacer(modifier = Modifier.height(32.dp))
@@ -699,9 +692,11 @@ private fun TestConnectionButton(
     apiKey: String,
     baseUrl: String,
     model: String,
-    onTest: () -> Unit
+    onSave: (String, String, String, String) -> Unit,
+    onTest: suspend () -> Result<Long>
 ) {
     var testState by remember { mutableStateOf<TestState>(TestState.Idle) }
+    val coroutineScope = rememberCoroutineScope()
     
     val borderColor by animateColorAsState(
         targetValue = when (testState) {
@@ -727,7 +722,16 @@ private fun TestConnectionButton(
                 provider == "Custom" && baseUrl.isBlank() -> testState = TestState.Error("Base URL is required")
                 provider == "Ollama (Local)" && baseUrl.isBlank() -> testState = TestState.Error("Base URL is required")
                 provider != "Ollama (Local)" && provider != "Custom" && apiKey.isBlank() -> testState = TestState.Error("API key is required")
-                else -> onTest()
+                else -> {
+                    onSave(provider, baseUrl, apiKey, model)
+                    coroutineScope.launch {
+                        testState = TestState.Loading
+                        testState = onTest().fold(
+                            onSuccess = { TestState.Success(it) },
+                            onFailure = { TestState.Error(it.message ?: "Connection failed") }
+                        )
+                    }
+                }
             }
         },
         modifier = Modifier.fillMaxWidth(),
