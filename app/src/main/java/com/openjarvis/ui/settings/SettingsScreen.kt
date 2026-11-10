@@ -40,10 +40,17 @@ import com.openjarvis.voice.STTMode
 import com.openjarvis.voice.VoiceManager
 import com.openjarvis.ui.theme.VoidColor
 
+data class ProviderFormSettings(
+    val baseUrl: String,
+    val apiKey: String,
+    val model: String
+)
+
 @Composable
 fun SettingsScreen(
     onNavigateBack: () -> Unit,
     onSaveProvider: (String, String, String, String) -> Unit,
+    onLoadProvider: (String) -> ProviderFormSettings,
     onTestConnection: suspend () -> Result<Long>,
     voiceManager: VoiceManager,
     initialProviderName: String = "Groq",
@@ -103,7 +110,11 @@ fun SettingsScreen(
                     isExpanded = showProvidersDropdown,
                     onToggle = { showProvidersDropdown = !showProvidersDropdown },
                     onSelect = { provider ->
+                        val saved = onLoadProvider(provider)
                         selectedProvider = provider
+                        baseUrl = saved.baseUrl
+                        apiKey = saved.apiKey
+                        model = saved.model
                         showProvidersDropdown = false
                     }
                 )
@@ -697,6 +708,10 @@ private fun TestConnectionButton(
 ) {
     var testState by remember { mutableStateOf<TestState>(TestState.Idle) }
     val coroutineScope = rememberCoroutineScope()
+
+    LaunchedEffect(provider) {
+        testState = TestState.Idle
+    }
     
     val borderColor by animateColorAsState(
         targetValue = when (testState) {
@@ -734,6 +749,7 @@ private fun TestConnectionButton(
                 }
             }
         },
+        enabled = testState !is TestState.Loading,
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
         border = BorderStroke(1.dp, borderColor),
