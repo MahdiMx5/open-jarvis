@@ -120,30 +120,46 @@ object MusicDownloadManager {
         ) == android.content.pm.PackageManager.PERMISSION_GRANTED
     }
 
+    /**
+     * MediaStore indexes music from all visible shared-storage folders and external volumes.
+     * This includes the phone's shared internal storage and removable SD-card volumes.
+     * Android-private app folders and folders hidden with .nomedia are intentionally not scanned.
+     */
     private fun isAlreadyInLibrary(context: Context, remoteTitle: String): Boolean {
+        val queryTokens = normalize(remoteTitle).split(' ').filter { it.length > 1 }.toSet()
+        if (queryTokens.isEmpty()) return false
+
         val projection = arrayOf(
             MediaStore.Audio.Media.TITLE,
+            MediaStore.Audio.Media.ARTIST,
             MediaStore.Audio.Media.DISPLAY_NAME
         )
         val selection = "${MediaStore.Audio.Media.IS_MUSIC} != 0"
-        val remote = normalize(remoteTitle)
-        val cursor: Cursor? = context.contentResolver.query(
-            MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
-            projection,
-            selection,
-            null,
-            null
-        )
-        cursor.use { rows ->
-            if (rows == null) return false
-            val titleIndex = rows.getColumnIndex(MediaStore.Audio.Media.TITLE)
-            val nameIndex = rows.getColumnIndex(MediaStore.Audio.Media.DISPLAY_NAME)
-            while (rows.moveToNext()) {
-                val localTitle = if (titleIndex >= 0) normalize(rows.getString(titleIndex).orEmpty()) else ""
-                val displayName = if (nameIndex >= 0) normalize(rows.getString(nameIndex).orEmpty()) else ""
-                if (localTitle == remote || displayName == remote ||
-                    (remote.length >= 8 && (localTitle.contains(remote) || displayName.contains(remote)))) {
-                    return true
+        val volumes = runCatching { MediaStore.getExternalVolumeNames(context) }
+            .getOrElse { setOf(MediaStore.VOLUME_EXTERNAL) }
+
+        for (volume in volumes) {
+            val collection = MediaStore.Audio.Media.getContentUri(volume)
+            val cursor: Cursor? = runCatching {
+                context.contentResolver.query(collection, projection, selection, null, null)
+            }.getOrNull()
+
+            cursor.use { rows ->
+                if (rows == null) continue
+                val titleIndex = rows.getColumnIndex(MediaStore.Audio.Media.TITLE)
+                val artistIndex = rows.getColumnIndex(MediaStore.Audio.Media.ARTIST)
+                val nameIndex = rows.getColumnIndex(MediaStore.Audio.Media.DISPLAY_NAME)
+
+                while (rows.moveToNext()) {
+                    val title = if (titleIndex >= 0) rows.getString(titleIndex).orEmpty() else ""
+                    val artist = if (artistIndex >= 0) rows.getString(artistIndex).orEmpty() else ""
+                    val fileName = if (nameIndex >= 0) rows.getString(nameIndex).orEmpty() else ""
+                    val titleTokens = normalize(title).split(' ').filter { it.length > 1 }.toSet()
+                    val combinedTokens = normalize("$title $artist $fileName").split(' ').filter { it.length > 1 }.toSet()
+
+                    val allQueryWordsFound = queryTokens.all { it in combinedTokens }
+                    val titleCoverage = queryTokens.count { it in titleTokens }.toFloat() / queryTokens.size
+                    if (allQueryWordsFound || titleCoverage >= 0.8f) return true
                 }
             }
         }
