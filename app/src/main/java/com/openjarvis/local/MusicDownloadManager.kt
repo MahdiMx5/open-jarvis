@@ -145,21 +145,22 @@ object MusicDownloadManager {
             }.getOrNull()
 
             cursor.use { rows ->
-                if (rows == null) continue
-                val titleIndex = rows.getColumnIndex(MediaStore.Audio.Media.TITLE)
-                val artistIndex = rows.getColumnIndex(MediaStore.Audio.Media.ARTIST)
-                val nameIndex = rows.getColumnIndex(MediaStore.Audio.Media.DISPLAY_NAME)
+                if (rows != null) {
+                    val titleIndex = rows.getColumnIndex(MediaStore.Audio.Media.TITLE)
+                    val artistIndex = rows.getColumnIndex(MediaStore.Audio.Media.ARTIST)
+                    val nameIndex = rows.getColumnIndex(MediaStore.Audio.Media.DISPLAY_NAME)
 
-                while (rows.moveToNext()) {
-                    val title = if (titleIndex >= 0) rows.getString(titleIndex).orEmpty() else ""
-                    val artist = if (artistIndex >= 0) rows.getString(artistIndex).orEmpty() else ""
-                    val fileName = if (nameIndex >= 0) rows.getString(nameIndex).orEmpty() else ""
-                    val titleTokens = normalize(title).split(' ').filter { it.length > 1 }.toSet()
-                    val combinedTokens = normalize("$title $artist $fileName").split(' ').filter { it.length > 1 }.toSet()
+                    while (rows.moveToNext()) {
+                        val title = if (titleIndex >= 0) rows.getString(titleIndex).orEmpty() else ""
+                        val artist = if (artistIndex >= 0) rows.getString(artistIndex).orEmpty() else ""
+                        val fileName = if (nameIndex >= 0) rows.getString(nameIndex).orEmpty() else ""
+                        val titleTokens = normalize(title).split(' ').filter { it.length > 1 }.toSet()
+                        val combinedTokens = normalize("$title $artist $fileName").split(' ').filter { it.length > 1 }.toSet()
 
-                    val allQueryWordsFound = queryTokens.all { it in combinedTokens }
-                    val titleCoverage = queryTokens.count { it in titleTokens }.toFloat() / queryTokens.size
-                    if (allQueryWordsFound || titleCoverage >= 0.8f) return true
+                        val allQueryWordsFound = queryTokens.all { it in combinedTokens }
+                        val titleCoverage = queryTokens.count { it in titleTokens }.toFloat() / queryTokens.size
+                        if (allQueryWordsFound || titleCoverage >= 0.8f) return true
+                    }
                 }
             }
         }
