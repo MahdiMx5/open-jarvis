@@ -263,8 +263,6 @@ class OverlayService : LifecycleService() {
         return START_NOT_STICKY
     }
 
-    override fun onBind(intent: Intent?): IBinder? = null
-
     override fun onDestroy() {
         serviceRunning = false
         stateCollectJob?.cancel()
