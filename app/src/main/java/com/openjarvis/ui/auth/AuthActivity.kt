@@ -18,6 +18,8 @@ import androidx.credentials.exceptions.GetCredentialException
 import androidx.lifecycle.lifecycleScope
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
+import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential.Companion.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL
+import com.openjarvis.R
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.GoogleAuthProvider
 import com.openjarvis.ui.MainActivity
@@ -89,7 +91,7 @@ class AuthActivity : AppCompatActivity() {
         setLoading(true)
 
         val googleIdOption = GetGoogleIdOption.Builder()
-            .setServerClientId(getString(com.google.firebase.R.string.default_web_client_id))
+            .setServerClientId(getString(R.string.default_web_client_id))
             .setFilterByAuthorizedAccounts(false)
             .setAutoSelectEnabled(false)
             .build()
@@ -125,7 +127,7 @@ class AuthActivity : AppCompatActivity() {
 
     private fun handleCredential(credential: Credential) {
         if (credential !is CustomCredential ||
-            credential.type != GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL
+            credential.type != TYPE_GOOGLE_ID_TOKEN_CREDENTIAL
         ) {
             setLoading(false)
             Toast.makeText(this, "نوع حساب Google معتبر نیست.", Toast.LENGTH_LONG).show()
