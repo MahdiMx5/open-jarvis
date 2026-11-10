@@ -17,6 +17,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -43,6 +44,7 @@ import com.openjarvis.ui.theme.VoidColor
 fun SettingsScreen(
     onNavigateBack: () -> Unit,
     onSaveProvider: (String, String, String, String) -> Unit,
+    onTestConnection: suspend () -> Result<Long>,
     voiceManager: VoiceManager,
     initialProviderName: String = "Groq",
     initialBaseUrl: String = "",
@@ -72,6 +74,7 @@ fun SettingsScreen(
     }
     
     val scrollState = rememberScrollState()
+    val coroutineScope = rememberCoroutineScope()
     
     androidx.compose.runtime.CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
     Box(
@@ -146,13 +149,21 @@ fun SettingsScreen(
                 Spacer(modifier = Modifier.height(24.dp))
                 
                 TestConnectionButton(
+                    provider = selectedProvider,
                     apiKey = apiKey,
                     baseUrl = baseUrl,
                     model = model,
-                    onSave = { name, url, key, mdl ->
-                        onSaveProvider(name, url, key, mdl)
+                    onTest = {
+                        onSaveProvider(selectedProvider, baseUrl, apiKey, model)
                         lastSaved = System.currentTimeMillis()
                         savedVisible = true
+                        coroutineScope.launch {
+                            testState = TestState.Loading
+                            testState = onTestConnection().fold(
+                                onSuccess = { TestState.Success(it) },
+                                onFailure = { TestState.Error(it.message ?: "Connection failed") }
+                            )
+                        }
                     }
                 )
                 
@@ -684,10 +695,11 @@ fun FloatingLabelTextField(
 
 @Composable
 private fun TestConnectionButton(
+    provider: String,
     apiKey: String,
     baseUrl: String,
     model: String,
-    onSave: (String, String, String, String) -> Unit
+    onTest: () -> Unit
 ) {
     var testState by remember { mutableStateOf<TestState>(TestState.Idle) }
     
@@ -711,8 +723,12 @@ private fun TestConnectionButton(
     
     OutlinedButton(
         onClick = {
-            onSave("Groq", baseUrl, apiKey, model)
-            testState = TestState.Success(150)
+            when {
+                provider == "Custom" && baseUrl.isBlank() -> testState = TestState.Error("Base URL is required")
+                provider == "Ollama (Local)" && baseUrl.isBlank() -> testState = TestState.Error("Base URL is required")
+                provider != "Ollama (Local)" && provider != "Custom" && apiKey.isBlank() -> testState = TestState.Error("API key is required")
+                else -> onTest()
+            }
         },
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
@@ -734,7 +750,7 @@ private fun TestConnectionButton(
                 Text("Connected — ${state.ms}ms")
             }
             is TestState.Error -> {
-                Text("Failed — check key")
+                Text("Failed: ${state.message}")
             }
         }
     }
