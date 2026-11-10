@@ -42,15 +42,6 @@ class MainActivity : ComponentActivity() {
             ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.POST_NOTIFICATIONS), NOTIFICATION_PERMISSION_REQUEST)
             return
         }
-        ensureMusicLibraryPermission()
-    }
-
-    private fun ensureMusicLibraryPermission() {
-        val permission = if (Build.VERSION.SDK_INT >= 33) Manifest.permission.READ_MEDIA_AUDIO else Manifest.permission.READ_EXTERNAL_STORAGE
-        if (ContextCompat.checkSelfPermission(this, permission) != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(this, arrayOf(permission), MUSIC_PERMISSION_REQUEST)
-            return
-        }
         ensureMicrophonePermission()
     }
 
@@ -74,8 +65,7 @@ class MainActivity : ComponentActivity() {
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         when (requestCode) {
-            NOTIFICATION_PERMISSION_REQUEST -> ensureMusicLibraryPermission()
-            MUSIC_PERMISSION_REQUEST -> ensureMicrophonePermission()
+            NOTIFICATION_PERMISSION_REQUEST -> ensureMicrophonePermission()
             AUDIO_PERMISSION_REQUEST -> {
                 if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) startVoiceService()
                 else Toast.makeText(this, "برای فرمان صوتی، اجازهٔ میکروفون لازم است.", Toast.LENGTH_LONG).show()
@@ -86,6 +76,5 @@ class MainActivity : ComponentActivity() {
     companion object {
         private const val NOTIFICATION_PERMISSION_REQUEST = 1001
         private const val AUDIO_PERMISSION_REQUEST = 1002
-        private const val MUSIC_PERMISSION_REQUEST = 1003
     }
 }
