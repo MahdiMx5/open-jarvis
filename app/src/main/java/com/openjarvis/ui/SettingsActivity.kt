@@ -51,12 +51,24 @@ class SettingsActivity : ComponentActivity() {
                     },
                     onLoadProvider = { name ->
                         val providerKey = name.lowercase().replace(Regex("[^a-z0-9]+"), "_")
+                        val activeProvider = prefs.getString("provider_name", "Groq") ?: "Groq"
+                        val legacyFallback = name == activeProvider
                         ProviderFormSettings(
-                            baseUrl = prefs.getString("provider_${providerKey}_base_url", "") ?: "",
-                            apiKey = prefs.getString("provider_${providerKey}_api_key", "") ?: "",
+                            baseUrl = prefs.getString(
+                                "provider_${providerKey}_base_url",
+                                if (legacyFallback) prefs.getString("provider_base_url", "") else ""
+                            ) ?: "",
+                            apiKey = prefs.getString(
+                                "provider_${providerKey}_api_key",
+                                if (legacyFallback) prefs.getString("provider_api_key", "") else ""
+                            ) ?: "",
                             model = prefs.getString(
                                 "provider_${providerKey}_model",
-                                UniversalAdapter.getDefaultModel(name)
+                                if (legacyFallback) {
+                                    prefs.getString("provider_model", UniversalAdapter.getDefaultModel(name))
+                                } else {
+                                    UniversalAdapter.getDefaultModel(name)
+                                }
                             ) ?: UniversalAdapter.getDefaultModel(name)
                         )
                     },
@@ -67,8 +79,10 @@ class SettingsActivity : ComponentActivity() {
                     initialProviderName = prefs.getString("provider_name", "Groq") ?: "Groq",
                     initialBaseUrl = prefs.getString("provider_base_url", "") ?: "",
                     initialApiKey = prefs.getString("provider_api_key", "") ?: "",
-                    initialModel = prefs.getString("provider_model", "llama-3.1-70b-versatile")
-                        ?: "llama-3.1-70b-versatile",
+                    initialModel = prefs.getString(
+                        "provider_model",
+                        UniversalAdapter.getDefaultModel(prefs.getString("provider_name", "Groq") ?: "Groq")
+                    ) ?: UniversalAdapter.getDefaultModel(prefs.getString("provider_name", "Groq") ?: "Groq"),
                     modifier = Modifier.fillMaxSize()
                 )
             }
