@@ -11,6 +11,7 @@ import androidx.core.view.WindowCompat
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import com.openjarvis.R
+import com.openjarvis.llm.UniversalAdapter
 import com.openjarvis.ui.settings.SettingsScreen
 import com.openjarvis.ui.theme.OpenJarvisTheme
 import com.openjarvis.voice.VoiceManager
@@ -46,6 +47,9 @@ class SettingsActivity : ComponentActivity() {
                     onNavigateBack = { finish() },
                     onSaveProvider = { name, baseUrl, apiKey, model ->
                         saveProviderSettings(name, baseUrl, apiKey, model)
+                    },
+                    onTestConnection = {
+                        UniversalAdapter(applicationContext).testConnection()
                     },
                     voiceManager = voiceManager,
                     initialProviderName = prefs.getString("provider_name", "Groq") ?: "Groq",
