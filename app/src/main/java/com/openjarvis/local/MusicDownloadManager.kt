@@ -31,6 +31,9 @@ object MusicDownloadManager {
                 if (!hasLibraryPermission(context)) {
                     throw IllegalStateException("برای بررسی آهنگ‌های موجود، اجازهٔ دسترسی به فایل‌های صوتی لازم است.")
                 }
+                if (isAlreadyInLibrary(context, query)) {
+                    return@runCatching DownloadResult(query, true)
+                }
 
                 val searchUrl = "https://archive.org/advancedsearch.php?q=" +
                     URLEncoder.encode("title:($query) AND mediatype:audio", "UTF-8") +

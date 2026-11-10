@@ -264,6 +264,8 @@ class OverlayService : Service() {
             .replace(Regex("دانلود(ش)?( کن)?"), " ")
             .replace(Regex("(پخش کن|پخشش کن|بذار|بزار|بگذار|گوش بده|برام پخش کن)"), " ")
             .replace(Regex("^(لطفاً\\s*)?(این\\s+)?(آهنگ|موزیک)\\s+"), "")
+            .replace(Regex("^(لطفاً\\s*|لطفا\\s*|برام\\s*|برای من\\s*)"), "")
+            .replace(Regex("\\s+(رو|را|لطفاً|لطفا)$"), "")
             .replace(Regex("\\s+"), " ")
             .trim()
             .ifBlank { command.trim() }
