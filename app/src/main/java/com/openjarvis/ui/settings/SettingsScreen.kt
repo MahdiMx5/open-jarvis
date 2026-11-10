@@ -85,7 +85,7 @@ fun SettingsScreen(
     var sttMode by remember { mutableStateOf(voiceManager.getSTTMode()) }
     var recognitionLanguage by remember { mutableStateOf(voiceManager.getRecognitionLanguage()) }
     var showLanguageMenu by remember { mutableStateOf(false) }
-    val sttModeLabel = if (sttMode == STTMode.PUSH_TO_TALK) "نگه‌داشتن میکروفون" else "تشخیص خودکار سکوت"
+    val sttModeLabel = if (sttMode == STTMode.PUSH_TO_TALK) "نگه‌داشتن میکروفون" else "پایان خودکار گفتار"
     
     LaunchedEffect(selectedProvider) {
         showBaseUrlField = selectedProvider == "Custom"
@@ -244,7 +244,7 @@ fun SettingsScreen(
                                     text = if (sttMode == STTMode.PUSH_TO_TALK)
                                         "برای ضبط نگه دار و برای پایان رها کن"
                                     else
-                                        "با سکوت، ضبط به‌صورت خودکار تموم می‌شه",
+                                        "موتور تشخیص گفتار پس از مکث، گفتار را پایان می‌دهد",
                                     style = TextStyle(
                                         fontFamily = FontFamily.Default,
                                         fontWeight = FontWeight(400),
