@@ -48,7 +48,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
-import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -97,7 +96,6 @@ fun DashboardScreen(
     var showHistory by remember { mutableStateOf(false) }
     var showTone by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
-    val keyboard = LocalSoftwareKeyboardController.current
 
     val colors = if (darkMode) ChatColors(
         background = Color(0xFF101010),
@@ -132,7 +130,6 @@ fun DashboardScreen(
         val message = input.trim()
         if (message.isEmpty() || waitingForResponse) return
         input = ""
-        keyboard?.hide()
         append("user", message)
         waitingForResponse = true
         agent.executeTask(message)
