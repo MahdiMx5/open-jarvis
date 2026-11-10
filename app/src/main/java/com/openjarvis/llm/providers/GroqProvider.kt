@@ -75,8 +75,20 @@ class GroqProvider(
                 .build()
             
             HttpClient.client.newCall(request).execute().use { response ->
+                val responseBody = response.body?.string().orEmpty()
                 if (!response.isSuccessful) {
-                    throw Exception("HTTP ${response.code}")
+                    val providerMessage = runCatching {
+                        JSONObject(responseBody).optJSONObject("error")?.optString("message")
+                    }.getOrNull().orEmpty()
+                    val reason = when (response.code) {
+                        401 -> "Groq API key is invalid or expired"
+                        403 -> "Groq rejected this key or its permissions"
+                        404 -> "Groq API endpoint or model was not found"
+                        429 -> "Groq rate limit or quota reached"
+                        in 500..599 -> "Groq service is temporarily unavailable"
+                        else -> providerMessage.ifBlank { "Groq connection failed" }
+                    }
+                    throw Exception("$reason (HTTP ${response.code})")
                 }
             }
             System.currentTimeMillis() - startTime
