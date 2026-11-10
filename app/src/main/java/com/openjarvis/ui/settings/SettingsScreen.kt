@@ -65,7 +65,7 @@ fun SettingsScreen(
     initialProviderName: String = "Groq",
     initialBaseUrl: String = "",
     initialApiKey: String = "",
-    initialModel: String = "llama-3.1-70b-versatile",
+    initialModel: String = "openai/gpt-oss-20b",
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
