@@ -73,6 +73,7 @@ class OverlayService : LifecycleService() {
 
     override fun onCreate() {
         super.onCreate()
+        serviceRunning = true
 
         // Promote the service before doing database, crypto, or AI initialization.
         startForeground(NOTIFICATION_ID, createNotification(), android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE)
@@ -222,13 +223,30 @@ class OverlayService : LifecycleService() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         super.onStartCommand(intent, flags, startId)
-        if (intent?.action == ACTION_STOP) {
-            if (::voiceManager.isInitialized) {
-                voiceManager.stopListening()
-                voiceManager.stopSpeaking()
+        when (intent?.action) {
+            ACTION_STOP -> {
+                if (::voiceManager.isInitialized) {
+                    voiceManager.setVoiceEnabled(false)
+                    voiceManager.stopListening()
+                    voiceManager.stopSpeaking()
+                }
+                stopForeground(STOP_FOREGROUND_REMOVE)
+                stopSelf()
             }
-            stopForeground(STOP_FOREGROUND_REMOVE)
-            stopSelf()
+            ACTION_DISABLE_MIC -> {
+                if (::voiceManager.isInitialized) {
+                    voiceManager.setVoiceEnabled(false)
+                    voiceManager.stopListening()
+                    voiceManager.stopSpeaking()
+                }
+                wakeRestartJob?.cancel()
+            }
+            ACTION_ENABLE_MIC -> {
+                if (::voiceManager.isInitialized) {
+                    voiceManager.setVoiceEnabled(true)
+                    scheduleWakeListening(300L)
+                }
+            }
         }
         return START_NOT_STICKY
     }
@@ -236,6 +254,7 @@ class OverlayService : LifecycleService() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onDestroy() {
+        serviceRunning = false
         stateCollectJob?.cancel()
         voiceCollectJob?.cancel()
         wakeRestartJob?.cancel()
@@ -498,6 +517,17 @@ class OverlayService : LifecycleService() {
         private const val MESSAGE_CHANNEL_ID = "jarvis_messages"
         private const val NOTIFICATION_ID = 1
         private const val ACTION_STOP = "com.openjarvis.action.STOP_ASSISTANT"
+        private const val ACTION_DISABLE_MIC = "com.openjarvis.action.DISABLE_MIC"
+        private const val ACTION_ENABLE_MIC = "com.openjarvis.action.ENABLE_MIC"
+        @Volatile private var serviceRunning = false
+
+        fun syncVoicePreference(context: Context, enabled: Boolean) {
+            if (!serviceRunning) return
+            val action = if (enabled) ACTION_ENABLE_MIC else ACTION_DISABLE_MIC
+            runCatching {
+                context.startService(Intent(context, OverlayService::class.java).setAction(action))
+            }
+        }
 
         fun start(context: Context) {
             val intent = Intent(context, OverlayService::class.java)
