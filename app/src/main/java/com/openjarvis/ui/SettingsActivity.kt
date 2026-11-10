@@ -53,6 +53,14 @@ class SettingsActivity : ComponentActivity() {
                         val providerKey = name.lowercase().replace(Regex("[^a-z0-9]+"), "_")
                         val activeProvider = prefs.getString("provider_name", "Groq") ?: "Groq"
                         val legacyFallback = name == activeProvider
+                        val defaultModel = UniversalAdapter.getDefaultModel(name)
+                        val storedModel = prefs.getString(
+                            "provider_${providerKey}_model",
+                            if (legacyFallback) prefs.getString("provider_model", defaultModel) else defaultModel
+                        ) ?: defaultModel
+                        val selectedModel = if (
+                            name == "Groq" && storedModel == "llama-3.1-70b-versatile"
+                        ) defaultModel else storedModel
                         ProviderFormSettings(
                             baseUrl = prefs.getString(
                                 "provider_${providerKey}_base_url",
@@ -62,14 +70,7 @@ class SettingsActivity : ComponentActivity() {
                                 "provider_${providerKey}_api_key",
                                 if (legacyFallback) prefs.getString("provider_api_key", "") else ""
                             ) ?: "",
-                            model = prefs.getString(
-                                "provider_${providerKey}_model",
-                                if (legacyFallback) {
-                                    prefs.getString("provider_model", UniversalAdapter.getDefaultModel(name))
-                                } else {
-                                    UniversalAdapter.getDefaultModel(name)
-                                }
-                            ) ?: UniversalAdapter.getDefaultModel(name)
+                            model = selectedModel
                         )
                     },
                     onTestConnection = {
@@ -79,10 +80,12 @@ class SettingsActivity : ComponentActivity() {
                     initialProviderName = prefs.getString("provider_name", "Groq") ?: "Groq",
                     initialBaseUrl = prefs.getString("provider_base_url", "") ?: "",
                     initialApiKey = prefs.getString("provider_api_key", "") ?: "",
-                    initialModel = prefs.getString(
-                        "provider_model",
-                        UniversalAdapter.getDefaultModel(prefs.getString("provider_name", "Groq") ?: "Groq")
-                    ) ?: UniversalAdapter.getDefaultModel(prefs.getString("provider_name", "Groq") ?: "Groq"),
+                    initialModel = run {
+                        val provider = prefs.getString("provider_name", "Groq") ?: "Groq"
+                        val defaultModel = UniversalAdapter.getDefaultModel(provider)
+                        val savedModel = prefs.getString("provider_model", defaultModel) ?: defaultModel
+                        if (provider == "Groq" && savedModel == "llama-3.1-70b-versatile") defaultModel else savedModel
+                    },
                     modifier = Modifier.fillMaxSize()
                 )
             }
