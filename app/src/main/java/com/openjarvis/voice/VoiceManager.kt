@@ -115,11 +115,6 @@ class VoiceManager(private val context: Context) {
 
     // Push-to-talk mode
     fun startListening() {
-        if (!isVoiceEnabled()) {
-            _state.value = VoiceState.Error("Voice disabled in settings")
-            return
-        }
-
         scope.launch {
             _state.value = VoiceState.Recording
 
