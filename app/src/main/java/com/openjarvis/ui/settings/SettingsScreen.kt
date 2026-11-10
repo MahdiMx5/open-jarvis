@@ -38,8 +38,9 @@ import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import android.content.Intent
-import android.net.Uri
 import android.provider.Settings
+import android.net.Uri
+import android.speech.SpeechRecognizer
 import com.openjarvis.BuildConfig
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.sp
@@ -67,6 +68,8 @@ fun SettingsScreen(
     initialModel: String = "llama-3.1-70b-versatile",
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
+    val speechRecognitionAvailable = remember { SpeechRecognizer.isRecognitionAvailable(context) }
     var selectedProvider by remember { mutableStateOf(initialProviderName) }
     var baseUrl by remember { mutableStateOf(initialBaseUrl) }
     var apiKey by remember { mutableStateOf(initialApiKey) }
@@ -393,7 +396,7 @@ fun SettingsScreen(
                                 )
                             }
                             Text(
-                                text = "آماده",
+                                text = if (speechRecognitionAvailable) "آماده" else "در دسترس نیست",
                                 style = TextStyle(
                                     fontFamily = FontFamily.Default,
                                     fontWeight = FontWeight(500),
@@ -870,9 +873,6 @@ private fun PermissionStatusRows() {
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    val overlayGranted = remember(refreshKey) {
-        Settings.canDrawOverlays(context)
-    }
     val accessibilityGranted = remember(refreshKey) {
         val enabled = Settings.Secure.getString(
             context.contentResolver,
@@ -894,17 +894,11 @@ private fun PermissionStatusRows() {
 
     Spacer(modifier = Modifier.height(12.dp))
 
-    PermissionRow(
-        title = "نمایش روی برنامه‌ها",
-        subtitle = if (overlayGranted) "فعال است" else "برای پنجره شناور لازم است — لمس کن",
-        isGranted = overlayGranted,
-        onClick = {
-            val intent = Intent(
-                Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                Uri.parse("package:${context.packageName}")
-            )
-            context.startActivity(intent)
-        }
+    Text(
+        text = "پنجره شناور مستقل در این نسخه هنوز به سرویس اندروید متصل نشده است.",
+        color = VoidColor.TextDisabled,
+        fontSize = 11.sp,
+        modifier = Modifier.padding(horizontal = 4.dp)
     )
 }
 
@@ -1017,9 +1011,17 @@ private fun AboutRow(
     value: String,
     isLink: Boolean = false
 ) {
+    val context = LocalContext.current
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .then(
+                if (isLink) Modifier.clickable {
+                    context.startActivity(
+                        Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/MahdiMx5/open-jarvis"))
+                    )
+                } else Modifier
+            )
             .padding(16.dp),
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
