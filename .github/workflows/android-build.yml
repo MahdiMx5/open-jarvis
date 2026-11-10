@@ -39,6 +39,7 @@ jobs:
         run: |
           sdkmanager "platforms;android-34" "build-tools;34.0.0"
 
+      # Firebase configuration is restored from the Actions repository secret.
       - name: Restore Firebase configuration
         env:
           GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
