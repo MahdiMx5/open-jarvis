@@ -48,6 +48,34 @@ jobs:
           printf '%s' "$GOOGLE_SERVICES_JSON" > app/google-services.json
           python -m json.tool app/google-services.json > /dev/null
 
+      # Credential Manager requires the Web OAuth client ID as an Android string resource.
+      - name: Configure Google Sign-In client ID
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from xml.sax.saxutils import escape
+
+          config = json.loads(Path("app/google-services.json").read_text(encoding="utf-8"))
+          candidates = []
+          for client in config.get("client", []):
+              candidates.extend(client.get("oauth_client", []))
+              candidates.extend(client.get("services", {}).get("appinvite_service", {}).get("other_platform_oauth_client", []))
+          web_client = next((item.get("client_id") for item in candidates if item.get("client_type") == 3 and item.get("client_id")), None)
+          if not web_client:
+              raise SystemExit("Missing Web OAuth client (client_type=3) in GOOGLE_SERVICES_JSON. Download a fresh google-services.json after enabling Google Sign-In and creating the Web OAuth client in Firebase/Google Cloud.")
+          values = Path("app/src/main/res/values")
+          values.mkdir(parents=True, exist_ok=True)
+          output = values / "google_auth_client.xml"
+          output.write_text(
+              '<?xml version="1.0" encoding="utf-8"?>\\n<resources>\\n'
+              f'    <string name="default_web_client_id" translatable="false">{escape(web_client)}</string>\\n'
+              '</resources>\\n',
+              encoding="utf-8"
+          )
+          print("Google Sign-In Web client ID configured.")
+          PY
+
       - name: Build Debug APK
         run: |
           chmod +x ./gradlew
