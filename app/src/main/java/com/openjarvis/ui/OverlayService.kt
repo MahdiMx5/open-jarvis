@@ -247,6 +247,18 @@ class OverlayService : LifecycleService() {
                     scheduleWakeListening(300L)
                 }
             }
+            ACTION_REFRESH_SETTINGS -> {
+                if (::voiceManager.isInitialized) {
+                    voiceManager.stopListening()
+                    voiceManager.stopSpeaking()
+                    voiceManager.reloadSettings()
+                    if (voiceManager.isVoiceEnabled() && !processingCommand) {
+                        scheduleWakeListening(350L)
+                    } else {
+                        wakeRestartJob?.cancel()
+                    }
+                }
+            }
         }
         return START_NOT_STICKY
     }
@@ -519,6 +531,7 @@ class OverlayService : LifecycleService() {
         private const val ACTION_STOP = "com.openjarvis.action.STOP_ASSISTANT"
         private const val ACTION_DISABLE_MIC = "com.openjarvis.action.DISABLE_MIC"
         private const val ACTION_ENABLE_MIC = "com.openjarvis.action.ENABLE_MIC"
+        private const val ACTION_REFRESH_SETTINGS = "com.openjarvis.action.REFRESH_SETTINGS"
         @Volatile private var serviceRunning = false
 
         fun syncVoicePreference(context: Context, enabled: Boolean) {
@@ -526,6 +539,16 @@ class OverlayService : LifecycleService() {
             val action = if (enabled) ACTION_ENABLE_MIC else ACTION_DISABLE_MIC
             runCatching {
                 context.startService(Intent(context, OverlayService::class.java).setAction(action))
+            }
+        }
+
+        /** Apply saved voice/language/speech settings to the already-running service. */
+        fun refreshRuntimeSettings(context: Context) {
+            if (!serviceRunning) return
+            runCatching {
+                context.startService(
+                    Intent(context, OverlayService::class.java).setAction(ACTION_REFRESH_SETTINGS)
+                )
             }
         }
 
