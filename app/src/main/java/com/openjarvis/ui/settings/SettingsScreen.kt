@@ -263,7 +263,7 @@ fun SettingsScreen(
                                     fontFamily = FontFamily.Default,
                                     fontWeight = FontWeight(500),
                                     fontSize = 12.sp,
-                                    color = VoidColor.Violet
+                                    color = VoidColor.Cyan
                                 )
                             )
                         }
@@ -302,7 +302,7 @@ fun SettingsScreen(
                         },
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(14.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = VoidColor.VioletDim)
+                        colors = ButtonDefaults.buttonColors(containerColor = VoidColor.CyanDim)
                     ) {
                         Text("تست صدای زبان انتخاب‌شده")
                     }
@@ -580,20 +580,20 @@ private fun ProviderSelectorCard(
 @Composable
 private fun ProviderDot(provider: String) {
     val colors = mapOf(
-        "Groq" to VoidColor.Violet,
+        "Groq" to VoidColor.Cyan,
         "Google Gemini" to VoidColor.Cyan,
         "OpenRouter" to VoidColor.Green,
         "Anthropic Claude" to VoidColor.Amber,
         "OpenAI" to VoidColor.Green,
         "Ollama (Local)" to VoidColor.Cyan,
-        "Custom" to VoidColor.Violet
+        "Custom" to VoidColor.Cyan
     )
     
     Box(
         modifier = Modifier
             .size(8.dp)
             .clip(RoundedCornerShape(4.dp))
-            .background(colors[provider] ?: VoidColor.Violet)
+            .background(colors[provider] ?: VoidColor.Cyan)
     )
 }
 
@@ -615,7 +615,7 @@ private fun ProviderOption(
                 modifier = Modifier
                     .width(3.dp)
                     .height(16.dp)
-                    .background(VoidColor.Violet)
+                    .background(VoidColor.Cyan)
             )
             
             Spacer(modifier = Modifier.width(12.dp))
@@ -629,7 +629,7 @@ private fun ProviderOption(
                 fontFamily = FontFamily.Default,
                 fontWeight = FontWeight(500),
                 fontSize = 14.sp,
-                color = if (isSelected) VoidColor.Violet else VoidColor.TextPrimary
+                color = if (isSelected) VoidColor.Cyan else VoidColor.TextPrimary
             )
         )
     }
@@ -659,7 +659,7 @@ fun FloatingLabelTextField(
     )
     
     val borderColor by animateColorAsState(
-        targetValue = if (isFocused) VoidColor.Violet else VoidColor.BorderSubtle,
+        targetValue = if (isFocused) VoidColor.Cyan else VoidColor.BorderSubtle,
         animationSpec = tween(200),
         label = "border"
     )
@@ -727,8 +727,8 @@ private fun TestConnectionButton(
     
     val borderColor by animateColorAsState(
         targetValue = when (testState) {
-            is TestState.Idle -> VoidColor.VioletDim
-            is TestState.Loading -> VoidColor.Violet
+            is TestState.Idle -> VoidColor.CyanDim
+            is TestState.Loading -> VoidColor.Cyan
             is TestState.Success -> VoidColor.Green
             is TestState.Error -> VoidColor.Red
         },
@@ -737,8 +737,8 @@ private fun TestConnectionButton(
     )
     
     val textColor = when (testState) {
-        is TestState.Idle -> VoidColor.Violet
-        is TestState.Loading -> VoidColor.Violet
+        is TestState.Idle -> VoidColor.Cyan
+        is TestState.Loading -> VoidColor.Cyan
         is TestState.Success -> VoidColor.Green
         is TestState.Error -> VoidColor.Red
     }
@@ -774,7 +774,7 @@ private fun TestConnectionButton(
             is TestState.Loading -> CircularProgressIndicator(
                 modifier = Modifier.size(16.dp),
                 strokeWidth = 2.dp,
-                color = VoidColor.Violet
+                color = VoidColor.Cyan
             )
             is TestState.Success -> {
                 Icon(Icons.Default.Check, contentDescription = null)
@@ -856,7 +856,7 @@ private fun SettingsToggleRow(
                 enabled = onToggle != null,
                 colors = SwitchDefaults.colors(
                     checkedThumbColor = VoidColor.TextPrimary,
-                    checkedTrackColor = VoidColor.Violet,
+                    checkedTrackColor = VoidColor.Cyan,
                     uncheckedThumbColor = VoidColor.TextDisabled,
                     uncheckedTrackColor = VoidColor.Void600
                 )
@@ -1058,7 +1058,7 @@ private fun AboutRow(
                 fontFamily = FontFamily.Default,
                 fontWeight = FontWeight(400),
                 fontSize = 14.sp,
-                color = if (isLink) VoidColor.Violet else VoidColor.TextPrimary
+                color = if (isLink) VoidColor.Cyan else VoidColor.TextPrimary
             )
         )
     }
