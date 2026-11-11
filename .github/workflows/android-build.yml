@@ -39,6 +39,25 @@ jobs:
         run: |
           sdkmanager "platforms;android-34" "build-tools;34.0.0"
 
+      # Use Google's official full-color G mark for the localized sign-in button.
+      - name: Download official Google sign-in mark
+        run: |
+          mkdir -p app/src/main/res/drawable
+          curl --fail --location --retry 3 --retry-delay 2 \
+            "https://developers.google.com/identity/images/g-logo.png" \
+            --output app/src/main/res/drawable/google_g_logo.png
+          python - <<'PY'
+          from pathlib import Path
+          data = Path("app/src/main/res/drawable/google_g_logo.png").read_bytes()
+          if not data.startswith(b"\\x89PNG\\r\\n\\x1a\\n"):
+              raise SystemExit("Downloaded Google sign-in mark is not a valid PNG.")
+          width = int.from_bytes(data[16:20], "big")
+          height = int.from_bytes(data[20:24], "big")
+          if width < 48 or height < 48:
+              raise SystemExit(f"Google sign-in mark resolution is too small: {width}x{height}")
+          print(f"Official Google G asset verified: {width}x{height}")
+          PY
+
       # Firebase configuration is restored from the Actions repository secret.
       - name: Restore Firebase configuration
         env:
