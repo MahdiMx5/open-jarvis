@@ -1003,11 +1003,8 @@ private fun AboutSection() {
             Divider(thickness = 1.dp, color = VoidColor.BorderSubtle)
             AboutRow(title = "License", value = "MIT Open Source")
             Divider(thickness = 1.dp, color = VoidColor.BorderSubtle)
-            AboutRow(title = "GitHub", value = "MahdiMx5/open-jarvis", isLink = true)
-            Divider(thickness = 1.dp, color = VoidColor.BorderSubtle)
-            
             Text(
-                text = "Built on Android · From Termux with love",
+                text = "Open Mx5",
                 style = TextStyle(
                     fontFamily = FontFamily.Default,
                     fontWeight = FontWeight(400),
