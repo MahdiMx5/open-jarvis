@@ -14,6 +14,7 @@ class AndroidTTSEngine(private val context: Context) {
     private var speechRate = 0.96f
     private var pitch = 1.0f
     @Volatile private var preferredLanguageTag = "fa-IR"
+    @Volatile private var preferredVoiceName: String? = null
     private val completionCallbacks = ConcurrentHashMap<String, () -> Unit>()
 
     init {
@@ -23,6 +24,7 @@ class AndroidTTSEngine(private val context: Context) {
                 tts?.setLanguage(Locale.US)
                 tts?.setSpeechRate(speechRate)
                 tts?.setPitch(pitch)
+                applyPreferredVoice()
                 
                 tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
                     override fun onStart(utteranceId: String?) {}
@@ -88,6 +90,21 @@ class AndroidTTSEngine(private val context: Context) {
             // claim that a Persian voice is installed when the device lacks one.
             tts?.language = Locale.getDefault()
         }
+        applyPreferredVoice()
+    }
+
+    fun getAvailableVoices(): List<String> =
+        tts?.voices?.map { it.name }?.distinct()?.sorted().orEmpty()
+
+    fun setVoiceName(name: String?) {
+        preferredVoiceName = name?.takeIf { it.isNotBlank() }
+        applyPreferredVoice()
+    }
+
+    private fun applyPreferredVoice() {
+        val name = preferredVoiceName ?: return
+        val selected = tts?.voices?.firstOrNull { it.name == name } ?: return
+        tts?.voice = selected
     }
 
     fun stop() {
