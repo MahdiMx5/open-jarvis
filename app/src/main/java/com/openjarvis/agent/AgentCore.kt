@@ -348,15 +348,19 @@ RULES:
         pendingConfirmation?.takeIf { it.isActive }?.complete(approved)
     }
 
-    private suspend fun requestSensitiveInputConfirmation(
+    private suspend fun requestActionConfirmation(
         action: Action,
         packageName: String
     ): Boolean {
         val confirmation = CompletableDeferred<Boolean>()
         pendingConfirmation = confirmation
-        val preview = action.value.orEmpty().take(400)
+        val preview = when (action.action) {
+            Action.TYPE -> "Text to enter:\n${action.value.orEmpty().take(400)}"
+            Action.TAP -> "Element to tap: ${action.text.orEmpty().take(120)}"
+            else -> "Action: ${action.action}"
+        }
         _state.value = AgentState.AwaitingConfirmation(
-            "Sensitive app: $packageName\n\nText to enter:\n$preview\n\nConfirming lets Jarvis enter this text and continue the remaining steps. It may send or submit the text. Approve only if the destination and content are correct."
+            "Open Jarvis wants to interact with: $packageName\n\n$preview\n\nApprove only if this action and destination are correct. The action may submit information or change something in the other app."
         )
 
         return try {
@@ -422,8 +426,17 @@ RULES:
                 Action.TAP -> {
                     val text = action.text
                     val service = JarvisAccessibilityService.instance
-                    if (text.isNullOrBlank() || service?.tapByText(text) != true) {
+                    if (text.isNullOrBlank() || service == null) {
                         _state.value = AgentState.Error("Could not tap: ${text ?: "missing text"}")
+                        return
+                    }
+                    val activePackage = service.getActivePackageName() ?: "unknown app"
+                    if (!requestActionConfirmation(action, activePackage)) {
+                        _state.value = AgentState.Error("Tap action was cancelled or timed out")
+                        return
+                    }
+                    if (!service.tapByText(text)) {
+                        _state.value = AgentState.Error("Could not tap: $text")
                         return
                     }
                 }
@@ -436,18 +449,12 @@ RULES:
                         return
                     }
 
-                    val activePackage = service.getActivePackageName()
-                    if (RiskyActionConfirmation.requiresInputConfirmation(activePackage)) {
-                        val approved = requestSensitiveInputConfirmation(
-                            action,
-                            activePackage ?: "unknown app"
-                        )
-                        if (!approved) {
-                            _state.value = AgentState.Error("Sensitive text entry was cancelled or timed out")
-                            return
-                        }
-                        _state.value = AgentState.Running("entering confirmed text...")
+                    val activePackage = service.getActivePackageName() ?: "unknown app"
+                    if (!requestActionConfirmation(action, activePackage)) {
+                        _state.value = AgentState.Error("Text entry was cancelled or timed out")
+                        return
                     }
+                    _state.value = AgentState.Running("entering confirmed text...")
 
                     if (!service.typeText(value)) {
                         _state.value = AgentState.Error("Could not type text")
