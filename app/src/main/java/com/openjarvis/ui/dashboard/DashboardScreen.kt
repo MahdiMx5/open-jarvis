@@ -29,6 +29,7 @@ import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Security
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Divider
 import androidx.compose.material3.Icon
@@ -80,6 +81,7 @@ private data class ChatColors(
 fun DashboardScreen(
     onStartOverlay: () -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenPermissions: () -> Unit,
     graphifyRepo: GraphifyRepository,
     modifier: Modifier = Modifier
 ) {
@@ -188,6 +190,9 @@ fun DashboardScreen(
                         prefs.edit().putBoolean("dark_mode", darkMode).apply()
                     }) {
                         Icon(if (darkMode) Icons.Default.LightMode else Icons.Default.DarkMode, contentDescription = "تغییر پوسته", tint = colors.text)
+                    }
+                    IconButton(onClick = onOpenPermissions) {
+                        Icon(Icons.Default.Security, contentDescription = "مجوزها", tint = colors.text)
                     }
                     IconButton(onClick = onOpenSettings) {
                         Icon(Icons.Default.Settings, contentDescription = "تنظیمات", tint = colors.text)
