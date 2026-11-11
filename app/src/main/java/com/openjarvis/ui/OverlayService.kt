@@ -20,7 +20,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.lifecycle.LifecycleService
+import androidx.lifecycle.SavedStateRegistryOwner
+import androidx.savedstate.SavedStateRegistry
+import androidx.savedstate.SavedStateRegistryController
 import androidx.lifecycle.setViewTreeLifecycleOwner
+import androidx.lifecycle.setViewTreeSavedStateRegistryOwner
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -47,7 +51,11 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.collect
 import java.util.Locale
 
-class OverlayService : LifecycleService() {
+class OverlayService : LifecycleService(), SavedStateRegistryOwner {
+
+    private val savedStateController: SavedStateRegistryController = SavedStateRegistryController.create(this)
+    override val savedStateRegistry: SavedStateRegistry
+        get() = savedStateController.savedStateRegistry
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
@@ -71,6 +79,8 @@ class OverlayService : LifecycleService() {
 
     override fun onCreate() {
         super.onCreate()
+        savedStateController.performAttach()
+        savedStateController.performRestore(null)
         serviceRunning = true
 
         // Promote the service before doing database, crypto, or AI initialization.
@@ -151,6 +161,7 @@ class OverlayService : LifecycleService() {
             val view = ComposeView(this).apply {
                 setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindow)
                 setViewTreeLifecycleOwner(this@OverlayService)
+                setViewTreeSavedStateRegistryOwner(this@OverlayService)
                 setContent {
                     OpenJarvisTheme {
                         val state by agentCore.state.collectAsState()
