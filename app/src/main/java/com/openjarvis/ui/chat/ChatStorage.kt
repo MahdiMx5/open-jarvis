@@ -5,7 +5,13 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.util.UUID
 
-data class ChatMessage(val id: String, val role: String, val text: String, val timestamp: Long)
+data class ChatMessage(
+    val id: String,
+    val role: String,
+    val text: String,
+    val timestamp: Long,
+    val isFavorite: Boolean = false
+)
 data class ChatThread(val id: String, val title: String, val updatedAt: Long, val messages: List<ChatMessage>)
 
 object ChatStorage {
@@ -22,7 +28,13 @@ object ChatStorage {
                 val messageArray = obj.optJSONArray("messages") ?: JSONArray()
                 val messages = (0 until messageArray.length()).map { messageIndex ->
                     val item = messageArray.getJSONObject(messageIndex)
-                    ChatMessage(item.optString("id"), item.optString("role", "assistant"), item.optString("text"), item.optLong("timestamp"))
+                    ChatMessage(
+                        item.optString("id"),
+                        item.optString("role", "assistant"),
+                        item.optString("text"),
+                        item.optLong("timestamp"),
+                        item.optBoolean("isFavorite", false)
+                    )
                 }
                 ChatThread(obj.optString("id"), obj.optString("title", "گفت‌وگوی جدید"), obj.optLong("updatedAt"), messages)
             }.sortedByDescending { it.updatedAt }
@@ -36,6 +48,30 @@ object ChatStorage {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().apply {
             if (id == null) remove(KEY_CURRENT) else putString(KEY_CURRENT, id)
         }.apply()
+    }
+
+    private fun saveThreads(context: Context, threads: List<ChatThread>) {
+        val encoded = JSONArray()
+        threads.sortedByDescending { it.updatedAt }.take(30).forEach { thread ->
+            val messageArray = JSONArray()
+            thread.messages.forEach { message ->
+                messageArray.put(JSONObject().apply {
+                    put("id", message.id)
+                    put("role", message.role)
+                    put("text", message.text)
+                    put("timestamp", message.timestamp)
+                    put("isFavorite", message.isFavorite)
+                })
+            }
+            encoded.put(JSONObject().apply {
+                put("id", thread.id)
+                put("title", thread.title)
+                put("updatedAt", thread.updatedAt)
+                put("messages", messageArray)
+            })
+        }
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putString(KEY_THREADS, encoded.toString()).apply()
     }
 
     fun appendMessage(context: Context, threadId: String?, role: String, text: String): ChatThread {
@@ -54,21 +90,22 @@ object ChatStorage {
             messages = base.messages + ChatMessage(UUID.randomUUID().toString(), role, text, now)
         )
         if (index >= 0) threads[index] = updated else threads.add(updated)
-        val encoded = JSONArray()
-        threads.sortedByDescending { it.updatedAt }.take(30).forEach { thread ->
-            val messageArray = JSONArray()
-            thread.messages.forEach { message ->
-                messageArray.put(JSONObject().apply {
-                    put("id", message.id); put("role", message.role); put("text", message.text); put("timestamp", message.timestamp)
-                })
-            }
-            encoded.put(JSONObject().apply {
-                put("id", thread.id); put("title", thread.title); put("updatedAt", thread.updatedAt); put("messages", messageArray)
-            })
-        }
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
-            .putString(KEY_THREADS, encoded.toString()).putString(KEY_CURRENT, updated.id).apply()
+        saveThreads(context, threads)
+        setCurrentThreadId(context, updated.id)
         return updated
+    }
+
+    fun setMessageFavorite(context: Context, threadId: String, messageId: String, favorite: Boolean): List<ChatThread> {
+        val threads = loadThreads(context).map { thread ->
+            if (thread.id != threadId) thread else thread.copy(
+                updatedAt = System.currentTimeMillis(),
+                messages = thread.messages.map { message ->
+                    if (message.id == messageId) message.copy(isFavorite = favorite) else message
+                }
+            )
+        }
+        saveThreads(context, threads)
+        return threads.sortedByDescending { it.updatedAt }
     }
 
     fun findThread(context: Context, id: String?): ChatThread? =
