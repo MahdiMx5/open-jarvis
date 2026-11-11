@@ -1,5 +1,6 @@
 package com.openjarvis.ui.dashboard
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -57,6 +58,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.TextStyle
@@ -69,6 +72,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import android.app.Activity
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.net.Uri
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.UserProfileChangeRequest
 import com.openjarvis.ui.auth.AuthActivity
@@ -153,6 +159,21 @@ fun DashboardScreen(
     var showProfile by remember { mutableStateOf(false) }
     var profileName by remember { mutableStateOf(FirebaseAuth.getInstance().currentUser?.displayName.orEmpty()) }
     var profileStatus by remember { mutableStateOf<String?>(null) }
+    var profilePhotoUri by remember { mutableStateOf(prefs.getString("profile_photo_uri", null)?.let(Uri::parse)) }
+    var profilePhotoBitmap by remember { mutableStateOf<Bitmap?>(null) }
+    val profilePhotoPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            runCatching { context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) }
+            profilePhotoUri = uri
+            prefs.edit().putString("profile_photo_uri", uri.toString()).apply()
+        }
+    }
+    LaunchedEffect(profilePhotoUri) {
+        val uri = profilePhotoUri
+        profilePhotoBitmap = if (uri == null) null else withContext(Dispatchers.IO) {
+            runCatching { context.contentResolver.openInputStream(uri)?.use(BitmapFactory::decodeStream) }.getOrNull()
+        }
+    }
     val listState = rememberLazyListState()
 
     val colors = if (darkMode) ChatColors(
@@ -505,19 +526,29 @@ fun DashboardScreen(
                     verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     Surface(
-                        modifier = Modifier.size(68.dp),
+                        modifier = Modifier.size(68.dp).clickable { profilePhotoPicker.launch(arrayOf("image/*")) },
                         shape = RoundedCornerShape(34.dp),
                         color = colors.accent.copy(alpha = 0.16f)
                     ) {
                         Box(contentAlignment = Alignment.Center) {
-                            Text(
-                                (user?.displayName?.firstOrNull() ?: user?.email?.firstOrNull() ?: 'M').uppercase(),
-                                color = colors.accent,
-                                fontSize = 28.sp,
-                                fontWeight = FontWeight.Bold
-                            )
+                            if (profilePhotoBitmap != null) {
+                                Image(
+                                    bitmap = profilePhotoBitmap!!.asImageBitmap(),
+                                    contentDescription = "عکس پروفایل",
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentScale = ContentScale.Crop
+                                )
+                            } else {
+                                Text(
+                                    (user?.displayName?.firstOrNull() ?: user?.email?.firstOrNull() ?: 'M').uppercase(),
+                                    color = colors.accent,
+                                    fontSize = 28.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
                         }
                     }
+                    Text("برای تغییر عکس، روی تصویر بزن.", color = colors.muted, fontSize = 10.sp)
                     Text("پروفایل من", color = colors.text, fontSize = 20.sp, fontWeight = FontWeight.Bold)
                     Text(user?.email ?: "حساب مهمان", color = colors.muted, fontSize = 12.sp)
                 }
