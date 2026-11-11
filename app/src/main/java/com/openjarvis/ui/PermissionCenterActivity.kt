@@ -66,7 +66,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import com.openjarvis.accessibility.JarvisAccessibilityService
-import com.openjarvis.intelligence.JarvisNotificationListener
 import com.openjarvis.ui.theme.OpenJarvisTheme
 import com.openjarvis.ui.theme.VoidColor
 
@@ -136,15 +135,6 @@ class PermissionCenterActivity : ComponentActivity() {
         return enabled.split(':').any { it.equals(component, ignoreCase = true) }
     }
 
-    private fun isNotificationListenerEnabled(): Boolean {
-        val enabled = Settings.Secure.getString(
-            contentResolver,
-            "enabled_notification_listeners"
-        ).orEmpty()
-        val component = ComponentName(this, JarvisNotificationListener::class.java).flattenToString()
-        return enabled.split(':').any { it.equals(component, ignoreCase = true) }
-    }
-
     private fun permissionItems(): List<PermissionItem> {
         val items = mutableListOf(
             PermissionItem(
@@ -171,14 +161,6 @@ class PermissionCenterActivity : ComponentActivity() {
                 granted = isAccessibilityEnabled(),
                 special = true
             ),
-            PermissionItem(
-                id = "NOTIFICATION_LISTENER",
-                title = "دسترسی به اعلان‌ها",
-                description = "برای نمایش و خلاصه‌سازی اعلان‌های دریافتی",
-                explanation = "جارویس می‌تواند اعلان‌های گوشی را ببیند؛ اعلان‌ها ممکن است شامل متن پیام‌ها و اطلاعات خصوصی باشند. فقط اگر قابلیت خواندن اعلان‌ها را می‌خواهی این دسترسی را فعال کن.",
-                granted = isNotificationListenerEnabled(),
-                special = true
-            )
         )
         if (Build.VERSION.SDK_INT >= 33) {
             items.add(
@@ -224,7 +206,6 @@ class PermissionCenterActivity : ComponentActivity() {
                 }
             }
             "ACCESSIBILITY" -> startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
-            "NOTIFICATION_LISTENER" -> startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
         }
     }
 }
@@ -358,7 +339,7 @@ private fun PermissionCard(item: PermissionItem, onClick: () -> Unit) {
             Icon(
                 imageVector = when (item.id) {
                     Manifest.permission.RECORD_AUDIO -> Icons.Default.Mic
-                    Manifest.permission.POST_NOTIFICATIONS, "NOTIFICATION_LISTENER" -> Icons.Default.Notifications
+                    Manifest.permission.POST_NOTIFICATIONS -> Icons.Default.Notifications
                     Manifest.permission.READ_MEDIA_AUDIO, Manifest.permission.READ_EXTERNAL_STORAGE -> Icons.Default.Lock
                     "ACCESSIBILITY" -> Icons.Default.Visibility
                     else -> Icons.Default.Lock
