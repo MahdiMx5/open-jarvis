@@ -23,7 +23,22 @@ class ProviderFallbackChain(private val context: Context) {
     suspend fun completeWithFallback(system: String, user: String): Result<String> {
         val adapter = UniversalAdapter(context)
         val activeName = adapter.getProviderName()
-        val orderedNames = (listOf(activeName) + fallbackOrder).distinct()
+        val autoRouting = prefs.getBoolean("auto_ai_routing", true)
+        val task = user.lowercase()
+        val taskPriority = when {
+            listOf("کدنویسی", "برنامه‌نویسی", "کد ", "debug", "compile", "gradle", "kotlin", "python", "code").any { task.contains(it) } ->
+                listOf("OpenAI", "Anthropic Claude", "Groq", "OpenRouter", "Google Gemini")
+            listOf("تحلیل", "مقایسه", "طراحی معماری", "تحقیق", "استدلال", "analyze", "research", "architecture", "reasoning").any { task.contains(it) } ->
+                listOf("Anthropic Claude", "OpenAI", "Google Gemini", "OpenRouter", "Groq")
+            listOf("ترجمه", "خلاصه", "سلام", "چطوری", "translate", "summarize", "hello").any { task.contains(it) } ->
+                listOf("Google Gemini", "Groq", "OpenRouter", "OpenAI", "Anthropic Claude")
+            else -> listOf("Groq", "Google Gemini", "OpenAI", "OpenRouter", "Anthropic Claude")
+        }
+        val orderedNames = if (autoRouting) {
+            (taskPriority + listOf(activeName) + fallbackOrder).distinct()
+        } else {
+            (listOf(activeName) + fallbackOrder).distinct()
+        }
         val providers = orderedNames.mapNotNull { name ->
             if (!adapter.isProviderConfigured(name) || isInCooldown(name)) return@mapNotNull null
             adapter.getProviderForName(name)?.let { provider -> provider to name }
