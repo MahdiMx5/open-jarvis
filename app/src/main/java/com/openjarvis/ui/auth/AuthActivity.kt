@@ -174,7 +174,7 @@ class AuthActivity : AppCompatActivity() {
                                 }
                             }
 
-                            HorizontalDivider(
+                            Divider(
                                 modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp),
                                 color = VoidColor.BorderSubtle
                             )
