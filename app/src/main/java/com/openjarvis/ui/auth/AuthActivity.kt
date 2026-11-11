@@ -6,6 +6,7 @@ import android.util.Log
 import androidx.activity.compose.setContent
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -15,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
@@ -35,6 +37,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.credentials.Credential
@@ -122,20 +125,41 @@ class AuthActivity : AppCompatActivity() {
                                 onClick = { startGoogleSignIn() },
                                 enabled = !loading,
                                 modifier = Modifier.fillMaxWidth().height(54.dp),
-                                shape = RoundedCornerShape(16.dp),
+                                shape = RoundedCornerShape(12.dp),
+                                border = BorderStroke(1.dp, Color(0xFF747775)),
                                 colors = ButtonDefaults.buttonColors(
-                                    containerColor = VoidColor.Cyan,
-                                    contentColor = Color(0xFF061116)
+                                    containerColor = Color.White,
+                                    contentColor = Color(0xFF1F1F1F),
+                                    disabledContainerColor = Color.White,
+                                    disabledContentColor = Color(0xFF1F1F1F)
                                 )
                             ) {
                                 if (loading) {
                                     CircularProgressIndicator(
                                         modifier = Modifier.size(20.dp),
-                                        color = Color(0xFF061116),
+                                        color = Color(0xFF1F1F1F),
                                         strokeWidth = 2.dp
                                     )
                                 } else {
-                                    Text("ادامه با Google", fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+                                    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.Center
+                                        ) {
+                                            Image(
+                                                painter = painterResource(id = R.drawable.google_g_logo),
+                                                contentDescription = "Google",
+                                                modifier = Modifier.size(20.dp)
+                                            )
+                                            Spacer(Modifier.size(10.dp))
+                                            Text(
+                                                "ادامه با Google",
+                                                color = Color(0xFF1F1F1F),
+                                                fontWeight = FontWeight.Medium,
+                                                fontSize = 14.sp
+                                            )
+                                        }
+                                    }
                                 }
                             }
                             if (errorMessage != null) {
