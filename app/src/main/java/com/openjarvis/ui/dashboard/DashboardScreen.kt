@@ -23,6 +23,9 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.DarkMode
@@ -49,6 +52,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -76,6 +80,9 @@ import com.openjarvis.ui.chat.ChatStorage
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 private data class ChatColors(
     val background: Color,
@@ -105,6 +112,36 @@ fun DashboardScreen(
     var responseMode by remember { mutableStateOf(prefs.getString("response_mode", "normal") ?: "normal") }
     var showMode by remember { mutableStateOf(false) }
     var input by remember { mutableStateOf("") }
+    var attachedFileName by remember { mutableStateOf<String?>(null) }
+    var attachedFileContent by remember { mutableStateOf<String?>(null) }
+    var fileLoading by remember { mutableStateOf(false) }
+    var fileError by remember { mutableStateOf<String?>(null) }
+    val coroutineScope = rememberCoroutineScope()
+    val textFilePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            runCatching {
+                context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            fileLoading = true
+            fileError = null
+            coroutineScope.launch {
+                val loaded = withContext(Dispatchers.IO) {
+                    runCatching {
+                        context.contentResolver.openInputStream(uri)?.bufferedReader(Charsets.UTF_8)?.use {
+                            it.readText().take(30000)
+                        } ?: throw IllegalStateException("خواندن فایل ممکن نشد")
+                    }
+                }
+                fileLoading = false
+                loaded.onSuccess { content ->
+                    attachedFileName = uri.lastPathSegment?.substringAfterLast(':') ?: "فایل متنی"
+                    attachedFileContent = content
+                }.onFailure { error ->
+                    fileError = error.localizedMessage ?: "خواندن فایل ناموفق بود"
+                }
+            }
+        }
+    }
     var currentThreadId by remember { mutableStateOf(ChatStorage.currentThreadId(context)) }
     var messages by remember { mutableStateOf(ChatStorage.findThread(context, currentThreadId)?.messages ?: emptyList()) }
     var threads by remember { mutableStateOf(ChatStorage.loadThreads(context)) }
@@ -157,11 +194,21 @@ fun DashboardScreen(
 
     fun sendMessage() {
         val message = input.trim()
-        if (message.isEmpty() || waitingForResponse) return
+        if ((message.isEmpty() && attachedFileContent.isNullOrBlank()) || waitingForResponse || fileLoading) return
+        val fileContent = attachedFileContent
+        val fileName = attachedFileName
+        val request = if (!fileContent.isNullOrBlank()) {
+            "$message\n\nمحتوای فایل پیوست‌شده ($fileName):\n$fileContent"
+        } else message
+        val displayMessage = if (!fileName.isNullOrBlank()) {
+            (message.ifBlank { "لطفاً این فایل را بررسی کن." }) + "\n\n📎 $fileName"
+        } else message
         input = ""
-        append("user", message)
+        attachedFileName = null
+        attachedFileContent = null
+        append("user", displayMessage)
         waitingForResponse = true
-        agent.executeTask(message, responseMode)
+        agent.executeTask(request, responseMode)
     }
 
     LaunchedEffect(agentState) {
@@ -321,6 +368,25 @@ fun DashboardScreen(
                 }
             }
 
+            if (fileLoading || attachedFileName != null || fileError != null) {
+                Text(
+                    when {
+                        fileLoading -> "در حال خواندن فایل…"
+                        fileError != null -> "خطای فایل: $fileError"
+                        else -> "فایل پیوست: $attachedFileName  ×"
+                    },
+                    color = if (fileError != null) Color(0xFFFF7777) else colors.accent,
+                    fontSize = 11.sp,
+                    modifier = Modifier.fillMaxWidth().clickable {
+                        if (!fileLoading) {
+                            attachedFileName = null
+                            attachedFileContent = null
+                            fileError = null
+                        }
+                    }.padding(horizontal = 20.dp, vertical = 4.dp)
+                )
+            }
+
             Surface(
                 color = colors.surface,
                 border = androidx.compose.foundation.BorderStroke(1.dp, colors.border),
@@ -332,6 +398,12 @@ fun DashboardScreen(
                     verticalAlignment = Alignment.Bottom,
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
+                    IconButton(
+                        onClick = { textFilePicker.launch(arrayOf("text/*", "application/json", "application/xml")) },
+                        enabled = !fileLoading && !waitingForResponse
+                    ) {
+                        Icon(Icons.Default.AttachFile, contentDescription = "پیوست فایل متنی", tint = colors.text)
+                    }
                     IconButton(onClick = onStartOverlay) {
                         Icon(Icons.Default.Mic, contentDescription = "فرمان صوتی", tint = colors.text)
                     }
