@@ -192,13 +192,31 @@ class PermissionCenterActivity : ComponentActivity() {
                 )
             )
         }
+
+        val mediaPermission = if (Build.VERSION.SDK_INT >= 33) {
+            Manifest.permission.READ_MEDIA_AUDIO
+        } else {
+            Manifest.permission.READ_EXTERNAL_STORAGE
+        }
+        items.add(
+            PermissionItem(
+                id = mediaPermission,
+                title = "فایل‌های صوتی",
+                description = "برای دسترسی به فایل‌های صوتی محلی در قابلیت‌های رسانه‌ای",
+                explanation = "این دسترسی فقط برای خواندن فایل‌های صوتی‌ای است که در قابلیت‌های رسانه‌ای جارویس انتخاب می‌کنی. اگر از این قابلیت استفاده نمی‌کنی، نیازی به فعال‌کردنش نیست.",
+                granted = ContextCompat.checkSelfPermission(this, mediaPermission) == PackageManager.PERMISSION_GRANTED,
+                special = false
+            )
+        )
         return items
     }
 
     private fun requestPermission(id: String) {
         when (id) {
             Manifest.permission.RECORD_AUDIO,
-            Manifest.permission.POST_NOTIFICATIONS -> runtimePermissionLauncher.launch(id)
+            Manifest.permission.POST_NOTIFICATIONS,
+            Manifest.permission.READ_MEDIA_AUDIO,
+            Manifest.permission.READ_EXTERNAL_STORAGE -> runtimePermissionLauncher.launch(id)
             "OVERLAY" -> {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                     startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName")))
@@ -339,6 +357,7 @@ private fun PermissionCard(item: PermissionItem, onClick: () -> Unit) {
                 imageVector = when (item.id) {
                     Manifest.permission.RECORD_AUDIO -> Icons.Default.Mic
                     Manifest.permission.POST_NOTIFICATIONS, "NOTIFICATION_LISTENER" -> Icons.Default.Notifications
+                    Manifest.permission.READ_MEDIA_AUDIO, Manifest.permission.READ_EXTERNAL_STORAGE -> Icons.Default.Lock
                     "ACCESSIBILITY" -> Icons.Default.Visibility
                     else -> Icons.Default.Lock
                 },
