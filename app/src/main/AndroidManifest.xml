@@ -43,6 +43,12 @@
             android:theme="@style/Theme.OpenJarvis" />
 
         <activity
+            android:name=".ui.PermissionCenterActivity"
+            android:exported="false"
+            android:parentActivityName=".ui.MainActivity"
+            android:theme="@style/Theme.OpenJarvis" />
+
+        <activity
             android:name=".ui.SettingsActivity"
             android:exported="false"
             android:parentActivityName=".ui.MainActivity"
