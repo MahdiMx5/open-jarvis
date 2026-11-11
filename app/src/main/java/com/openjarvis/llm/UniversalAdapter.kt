@@ -82,13 +82,29 @@ class UniversalAdapter(private val context: Context) {
     suspend fun testConnection(): Result<Long> = getActiveProvider().testConnection()
     
     fun saveSettings(name: String, baseUrl: String, apiKey: String, model: String) {
+        val suffix = name.lowercase().replace(Regex("[^a-z0-9]+"), "_")
         prefs.edit().apply {
+            // Keep a separate encrypted profile for every provider so switching never
+            // overwrites another provider's key, URL, or model.
+            putString("provider_${suffix}_base_url", baseUrl)
+            putString("provider_${suffix}_api_key", apiKey)
+            putString("provider_${suffix}_model", model)
+
+            // Keep the legacy active-provider keys in sync for existing app code.
             putString("provider_name", name)
             putString("provider_base_url", baseUrl)
             putString("provider_api_key", apiKey)
             putString("provider_model", model)
             apply()
         }
+    }
+
+    fun clearProviderCredentials(name: String) {
+        val suffix = name.lowercase().replace(Regex("[^a-z0-9]+"), "_")
+        prefs.edit()
+            .remove("provider_${suffix}_api_key")
+            .remove("provider_api_key".takeIf { name == getProviderName() } .orEmpty())
+            .apply()
     }
     
     fun getProviderName(): String = prefs.getString("provider_name", "Groq") ?: "Groq"
