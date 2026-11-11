@@ -85,7 +85,12 @@ fun SettingsScreen(
     var speechRate by remember { mutableFloatStateOf(voiceManager.getSpeechRate()) }
     var sttMode by remember { mutableStateOf(voiceManager.getSTTMode()) }
     var recognitionLanguage by remember { mutableStateOf(voiceManager.getRecognitionLanguage()) }
+    var ttsLanguage by remember { mutableStateOf(voiceManager.getTtsLanguage()) }
+    var selectedTtsVoice by remember { mutableStateOf(voiceManager.getTtsVoiceName()) }
+    var availableTtsVoices by remember { mutableStateOf(emptyList<String>()) }
     var showLanguageMenu by remember { mutableStateOf(false) }
+    var showTtsLanguageMenu by remember { mutableStateOf(false) }
+    var showTtsVoiceMenu by remember { mutableStateOf(false) }
     val sttModeLabel = if (sttMode == STTMode.PUSH_TO_TALK) "نگه‌داشتن میکروفون" else "پایان خودکار گفتار"
     
     LaunchedEffect(selectedProvider) {
@@ -303,7 +308,7 @@ fun SettingsScreen(
 
                     Button(
                         onClick = {
-                            val sample = when (recognitionLanguage) {
+                            val sample = when (ttsLanguage) {
                                 "en-US" -> "Hello! I am Jarvis. How can I help you?"
                                 "en-AU" -> "G’day! I’m Jarvis. How can I help you today?"
                                 "es-ES" -> "¡Hola! Soy Jarvis. ¿Cómo puedo ayudarte?"
@@ -333,8 +338,8 @@ fun SettingsScreen(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Column(Modifier.weight(1f)) {
-                                    Text("زبان تشخیص و پاسخ صوتی", color = VoidColor.TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-                                    Text("زبان گفتار ورودی و صدای خروجی جارویس", color = VoidColor.TextDisabled, fontSize = 11.sp)
+                                    Text("زبان تشخیص گفتار", color = VoidColor.TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                                    Text("زبان گفتار ورودی میکروفون", color = VoidColor.TextDisabled, fontSize = 11.sp)
                                 }
                                 Text(
                                     when (recognitionLanguage) {
@@ -368,6 +373,110 @@ fun SettingsScreen(
                                             OverlayService.refreshRuntimeSettings(context)
                                             showLanguageMenu = false
                                         }
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        color = VoidColor.Void900,
+                        border = BorderStroke(1.dp, VoidColor.BorderSubtle)
+                    ) {
+                        Column {
+                            Row(
+                                modifier = Modifier.fillMaxWidth().clickable { showTtsLanguageMenu = true }.padding(16.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(Modifier.weight(1f)) {
+                                    Text("زبان پاسخ صوتی", color = VoidColor.TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                                    Text("زبان صدایی که جارویس با آن صحبت می‌کند", color = VoidColor.TextDisabled, fontSize = 11.sp)
+                                }
+                                Text(
+                                    when (ttsLanguage) {
+                                        "en-US" -> "English (US)"
+                                        "en-AU" -> "English (Australia)"
+                                        "es-ES" -> "Español"
+                                        "de-DE" -> "Deutsch"
+                                        else -> "فارسی"
+                                    },
+                                    color = VoidColor.Cyan,
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                            DropdownMenu(
+                                expanded = showTtsLanguageMenu,
+                                onDismissRequest = { showTtsLanguageMenu = false }
+                            ) {
+                                listOf(
+                                    "fa-IR" to "فارسی",
+                                    "en-US" to "English (US)",
+                                    "en-AU" to "English (Australia)",
+                                    "es-ES" to "Español (España)",
+                                    "de-DE" to "Deutsch"
+                                ).forEach { (tag, label) ->
+                                    DropdownMenuItem(
+                                        text = { Text(label) },
+                                        onClick = {
+                                            ttsLanguage = tag
+                                            voiceManager.setTtsLanguage(tag)
+                                            OverlayService.refreshRuntimeSettings(context)
+                                            showTtsLanguageMenu = false
+                                        }
+                                    )
+                                }
+                            }
+                            Divider(color = VoidColor.BorderSubtle)
+                            Row(
+                                modifier = Modifier.fillMaxWidth().clickable {
+                                    availableTtsVoices = voiceManager.getAvailableTtsVoices()
+                                    showTtsVoiceMenu = true
+                                }.padding(16.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(Modifier.weight(1f)) {
+                                    Text("صدای نصب‌شده", color = VoidColor.TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                                    Text("انتخاب از صداهای موجود در موتور گفتار گوشی", color = VoidColor.TextDisabled, fontSize = 11.sp)
+                                }
+                                Text(
+                                    selectedTtsVoice ?: "پیش‌فرض دستگاه",
+                                    color = VoidColor.Cyan,
+                                    fontSize = 11.sp,
+                                    maxLines = 1
+                                )
+                            }
+                            DropdownMenu(
+                                expanded = showTtsVoiceMenu,
+                                onDismissRequest = { showTtsVoiceMenu = false }
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text("پیش‌فرض دستگاه") },
+                                    onClick = {
+                                        selectedTtsVoice = null
+                                        voiceManager.setTtsVoiceName(null)
+                                        OverlayService.refreshRuntimeSettings(context)
+                                        showTtsVoiceMenu = false
+                                    }
+                                )
+                                availableTtsVoices.forEach { voiceName ->
+                                    DropdownMenuItem(
+                                        text = { Text(voiceName) },
+                                        onClick = {
+                                            selectedTtsVoice = voiceName
+                                            voiceManager.setTtsVoiceName(voiceName)
+                                            OverlayService.refreshRuntimeSettings(context)
+                                            showTtsVoiceMenu = false
+                                        }
+                                    )
+                                }
+                                if (availableTtsVoices.isEmpty()) {
+                                    DropdownMenuItem(
+                                        text = { Text("صدایی از موتور گفتار دریافت نشد") },
+                                        onClick = { showTtsVoiceMenu = false }
                                     )
                                 }
                             }
