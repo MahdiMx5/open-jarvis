@@ -358,22 +358,101 @@ fun DashboardScreen(
 
     if (showProfile) {
         val user = FirebaseAuth.getInstance().currentUser
+        val providerNames = user?.providerData
+            ?.mapNotNull { it.providerId.takeIf { id -> id != "firebase" } }
+            ?.distinct()
+            ?.joinToString("، ")
+            .orEmpty()
+        val createdAt = user?.metadata?.creationTimestamp?.let {
+            SimpleDateFormat("yyyy/MM/dd", Locale("fa", "IR")).format(Date(it))
+        } ?: "نامشخص"
+        val lastSignIn = user?.metadata?.lastSignInTimestamp?.let {
+            SimpleDateFormat("yyyy/MM/dd • HH:mm", Locale("fa", "IR")).format(Date(it))
+        } ?: "نامشخص"
+
         AlertDialog(
             onDismissRequest = { showProfile = false },
             containerColor = colors.surface,
-            title = { Text("پروفایل کاربری", color = colors.text) },
+            title = {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Surface(
+                        modifier = Modifier.size(68.dp),
+                        shape = RoundedCornerShape(34.dp),
+                        color = colors.accent.copy(alpha = 0.16f)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Text(
+                                (user?.displayName?.firstOrNull() ?: user?.email?.firstOrNull() ?: 'M').uppercase(),
+                                color = colors.accent,
+                                fontSize = 28.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                    Text("پروفایل من", color = colors.text, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                    Text(user?.email ?: "حساب مهمان", color = colors.muted, fontSize = 12.sp)
+                }
+            },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text(user?.email.orEmpty(), color = colors.muted, fontSize = 12.sp)
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text("اطلاعات حساب", color = colors.accent, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                     androidx.compose.material3.OutlinedTextField(
                         value = profileName,
                         onValueChange = { profileName = it },
                         modifier = Modifier.fillMaxWidth(),
                         label = { Text("نام نمایشی") },
+                        placeholder = { Text("نامی که در پروفایل دیده می‌شود") },
                         singleLine = true
                     )
+                    ProfileInfoRow("وضعیت ایمیل", if (user?.isEmailVerified == true) "تأیید شده" else "تأیید نشده", colors)
+                    ProfileInfoRow("روش ورود", providerNames.ifBlank { "ایمیل / رمز عبور" }, colors)
+                    ProfileInfoRow("تاریخ ساخت حساب", createdAt, colors)
+                    ProfileInfoRow("آخرین ورود", lastSignIn, colors)
+                    ProfileInfoRow("شناسه حساب", user?.uid?.take(12)?.plus("…") ?: "—", colors)
                     if (profileStatus != null) {
-                        Text(profileStatus.orEmpty(), color = colors.muted, fontSize = 12.sp)
+                        Text(profileStatus.orEmpty(), color = colors.accent, fontSize = 12.sp)
+                    }
+                    Text(
+                        "اطلاعات امنیتی",
+                        color = colors.accent,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    if (user?.email?.isNotBlank() == true && user.isEmailVerified.not()) {
+                        TextButton(
+                            onClick = {
+                                user.sendEmailVerification().addOnCompleteListener { task ->
+                                    profileStatus = if (task.isSuccessful) {
+                                        "لینک تأیید به ایمیلت ارسال شد."
+                                    } else {
+                                        "ارسال ایمیل تأیید ناموفق بود: ${task.exception?.localizedMessage ?: "خطای نامشخص"}"
+                                    }
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) { Text("ارسال دوباره ایمیل تأیید") }
+                    }
+                    if (user?.email?.isNotBlank() == true) {
+                        TextButton(
+                            onClick = {
+                                FirebaseAuth.getInstance().sendPasswordResetEmail(user.email!!)
+                                    .addOnCompleteListener { task ->
+                                        profileStatus = if (task.isSuccessful) {
+                                            "لینک بازیابی رمز به ایمیلت ارسال شد."
+                                        } else {
+                                            "ارسال لینک بازیابی ناموفق بود: ${task.exception?.localizedMessage ?: "خطای نامشخص"}"
+                                        }
+                                    }
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) { Text("بازیابی یا تغییر رمز عبور") }
                     }
                 }
             },
@@ -382,15 +461,21 @@ fun DashboardScreen(
                     val current = FirebaseAuth.getInstance().currentUser
                     if (current == null) {
                         profileStatus = "حساب واردشده پیدا نشد."
+                    } else if (profileName.trim().isBlank()) {
+                        profileStatus = "نام نمایشی نمی‌تواند خالی باشد."
                     } else {
                         val request = UserProfileChangeRequest.Builder()
                             .setDisplayName(profileName.trim())
                             .build()
                         current.updateProfile(request).addOnCompleteListener { task ->
-                            profileStatus = if (task.isSuccessful) "نام پروفایل ذخیره شد." else "ذخیره ناموفق بود."
+                            profileStatus = if (task.isSuccessful) {
+                                "نام پروفایل با موفقیت ذخیره شد."
+                            } else {
+                                "ذخیره ناموفق بود: ${task.exception?.localizedMessage ?: "خطای نامشخص"}"
+                            }
                         }
                     }
-                }) { Text("ذخیره") }
+                }) { Text("ذخیره تغییرات") }
             },
             dismissButton = {
                 Row {
@@ -464,6 +549,25 @@ fun DashboardScreen(
                 }
             },
             confirmButton = { TextButton(onClick = { showTone = false }) { Text("تمام") } }
+        )
+    }
+}
+
+@Composable
+private fun ProfileInfoRow(label: String, value: String, colors: ChatColors) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(label, color = colors.muted, fontSize = 11.sp)
+        Text(
+            value,
+            color = colors.text,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Medium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
         )
     }
 }
