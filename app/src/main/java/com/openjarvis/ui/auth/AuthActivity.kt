@@ -43,7 +43,7 @@ import androidx.credentials.CustomCredential
 import androidx.credentials.GetCredentialRequest
 import androidx.credentials.exceptions.GetCredentialException
 import androidx.lifecycle.lifecycleScope
-import com.google.android.libraries.identity.googleid.GetGoogleIdOption
+import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential.Companion.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL
 import com.google.firebase.auth.FirebaseAuth
@@ -166,14 +166,14 @@ class AuthActivity : AppCompatActivity() {
         loading = true
         errorMessage = null
 
-        val googleIdOption = GetGoogleIdOption.Builder()
-            .setServerClientId(getString(R.string.default_web_client_id))
-            .setFilterByAuthorizedAccounts(false)
-            .setAutoSelectEnabled(false)
-            .build()
+        // This is an explicit button flow. Unlike the account-picker bottom sheet,
+        // it also supports users who need to add or re-authenticate a Google account.
+        val signInOption = GetSignInWithGoogleOption.Builder(
+            serverClientId = getString(R.string.default_web_client_id)
+        ).build()
 
         val request = GetCredentialRequest.Builder()
-            .addCredentialOption(googleIdOption)
+            .addCredentialOption(signInOption)
             .build()
 
         lifecycleScope.launch {
