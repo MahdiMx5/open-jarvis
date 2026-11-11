@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -23,6 +24,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.LightMode
@@ -57,6 +59,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import android.app.Activity
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.UserProfileChangeRequest
+import com.openjarvis.ui.auth.AuthActivity
 import com.openjarvis.agent.AgentCore
 import com.openjarvis.agent.AgentState
 import com.openjarvis.graphify.GraphifyRepository
@@ -98,6 +104,9 @@ fun DashboardScreen(
     var waitingForResponse by remember { mutableStateOf(false) }
     var showHistory by remember { mutableStateOf(false) }
     var showTone by remember { mutableStateOf(false) }
+    var showProfile by remember { mutableStateOf(false) }
+    var profileName by remember { mutableStateOf(FirebaseAuth.getInstance().currentUser?.displayName.orEmpty()) }
+    var profileStatus by remember { mutableStateOf<String?>(null) }
     val listState = rememberLazyListState()
 
     val colors = if (darkMode) ChatColors(
@@ -161,7 +170,7 @@ fun DashboardScreen(
     }
 
     androidx.compose.runtime.CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
-        Column(modifier = modifier.fillMaxSize().background(colors.background).statusBarsPadding()) {
+        Column(modifier = modifier.fillMaxSize().background(colors.background).statusBarsPadding().navigationBarsPadding().imePadding()) {
             Row(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 9.dp, vertical = 5.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -191,7 +200,7 @@ fun DashboardScreen(
                     }) {
                         Icon(if (darkMode) Icons.Default.LightMode else Icons.Default.DarkMode, contentDescription = "تغییر پوسته", tint = colors.text)
                     }
-                    IconButton(onClick = onOpenPermissions) {
+                    IconButton(onClick = {\n                        profileName = FirebaseAuth.getInstance().currentUser?.displayName.orEmpty()\n                        profileStatus = null\n                        showProfile = true\n                    }) {\n                        Icon(Icons.Default.AccountCircle, contentDescription = "پروفایل", tint = colors.text)\n                    }\n                    IconButton(onClick = onOpenPermissions) {
                         Icon(Icons.Default.Security, contentDescription = "مجوزها", tint = colors.text)
                     }
                     IconButton(onClick = onOpenSettings) {
@@ -252,7 +261,7 @@ fun DashboardScreen(
                 color = colors.surface,
                 border = androidx.compose.foundation.BorderStroke(1.dp, colors.border),
                 shape = RoundedCornerShape(24.dp),
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp).imePadding()
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp)
             ) {
                 Row(
                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 7.dp),
@@ -315,6 +324,57 @@ fun DashboardScreen(
                 }
             },
             confirmButton = { TextButton(onClick = { showHistory = false }) { Text("بستن") } }
+        )
+    }
+
+    if (showProfile) {
+        val user = FirebaseAuth.getInstance().currentUser
+        AlertDialog(
+            onDismissRequest = { showProfile = false },
+            containerColor = colors.surface,
+            title = { Text("پروفایل کاربری", color = colors.text) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(user?.email.orEmpty(), color = colors.muted, fontSize = 12.sp)
+                    androidx.compose.material3.OutlinedTextField(
+                        value = profileName,
+                        onValueChange = { profileName = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text("نام نمایشی") },
+                        singleLine = true
+                    )
+                    if (profileStatus != null) {
+                        Text(profileStatus.orEmpty(), color = colors.muted, fontSize = 12.sp)
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val current = FirebaseAuth.getInstance().currentUser
+                    if (current == null) {
+                        profileStatus = "حساب واردشده پیدا نشد."
+                    } else {
+                        val request = UserProfileChangeRequest.Builder()
+                            .setDisplayName(profileName.trim())
+                            .build()
+                        current.updateProfile(request).addOnCompleteListener { task ->
+                            profileStatus = if (task.isSuccessful) "نام پروفایل ذخیره شد." else "ذخیره ناموفق بود."
+                        }
+                    }
+                }) { Text("ذخیره") }
+            },
+            dismissButton = {
+                Row {
+                    TextButton(onClick = { showProfile = false }) { Text("بستن") }
+                    TextButton(onClick = {
+                        FirebaseAuth.getInstance().signOut()
+                        val intent = Intent(context, AuthActivity::class.java)
+                        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                        context.startActivity(intent)
+                        (context as? Activity)?.finish()
+                    }) { Text("خروج از حساب") }
+                }
+            }
         )
     }
 
