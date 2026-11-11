@@ -33,6 +33,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -106,7 +109,7 @@ class AuthActivity : AppCompatActivity() {
                             }
                             Spacer(Modifier.height(28.dp))
                             Text(
-                                "به Open Jarvis خوش آمدید",
+                                "به Open Mx5 خوش آمدید",
                                 color = VoidColor.TextPrimary,
                                 fontSize = 23.sp,
                                 fontWeight = FontWeight.Bold,
@@ -153,8 +156,15 @@ class AuthActivity : AppCompatActivity() {
                                             )
                                             Spacer(Modifier.size(10.dp))
                                             Text(
-                                                "ادامه با Google",
-                                                color = Color(0xFF1F1F1F),
+                                                text = buildAnnotatedString {
+                                                    append("ادامه با ")
+                                                    withStyle(SpanStyle(color = Color(0xFF4285F4))) { append("G") }
+                                                    withStyle(SpanStyle(color = Color(0xFFEA4335))) { append("o") }
+                                                    withStyle(SpanStyle(color = Color(0xFFFBBC05))) { append("o") }
+                                                    withStyle(SpanStyle(color = Color(0xFF4285F4))) { append("g") }
+                                                    withStyle(SpanStyle(color = Color(0xFF34A853))) { append("l") }
+                                                    withStyle(SpanStyle(color = Color(0xFFEA4335))) { append("e") }
+                                                },
                                                 fontWeight = FontWeight.Medium,
                                                 fontSize = 14.sp
                                             )
