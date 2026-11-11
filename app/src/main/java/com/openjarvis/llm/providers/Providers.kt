@@ -11,6 +11,27 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
 import org.json.JSONObject
 
+private fun readProviderResponse(response: okhttp3.Response, providerName: String): String {
+    val body = response.body?.string().orEmpty()
+    if (!response.isSuccessful) {
+        val detail = runCatching {
+            val json = JSONObject(body)
+            when {
+                json.has("error") && json.opt("error") is JSONObject ->
+                    json.getJSONObject("error").optString("message")
+                json.has("error") -> json.optString("error")
+                json.has("message") -> json.optString("message")
+                else -> body.take(500)
+            }
+        }.getOrDefault(body.take(500))
+        throw IllegalStateException(
+            "$providerName request failed (HTTP ${response.code}): ${detail.ifBlank { "No error details returned" }}"
+        )
+    }
+    if (body.isBlank()) throw IllegalStateException("$providerName returned an empty response")
+    return body
+}
+
 class OpenRouterProvider(
     private val apiKey: String,
     private val model: String = "meta-llama/llama-3-8b-instruct:free"
@@ -50,7 +71,7 @@ class OpenRouterProvider(
                 .build()
             
             HttpClient.client.newCall(request).execute().use { response ->
-                val body = response.body?.string() ?: throw Exception("Empty response")
+                val body = readProviderResponse(response, name)
                 val json = JSONObject(body)
                 if (json.has("choices")) {
                     json.getJSONArray("choices")
@@ -119,7 +140,7 @@ class AnthropicProvider(
                 .build()
             
             HttpClient.client.newCall(request).execute().use { response ->
-                val body = response.body?.string() ?: throw Exception("Empty response")
+                val body = readProviderResponse(response, name)
                 val json = JSONObject(body)
                 if (json.has("content")) {
                     json.getJSONArray("content")
@@ -200,7 +221,7 @@ class OpenAIProvider(
                 .build()
             
             HttpClient.client.newCall(request).execute().use { response ->
-                val body = response.body?.string() ?: throw Exception("Empty response")
+                val body = readProviderResponse(response, name)
                 val json = JSONObject(body)
                 if (json.has("choices")) {
                     json.getJSONArray("choices")
@@ -269,7 +290,7 @@ class OllamaProvider(
                 .build()
             
             HttpClient.client.newCall(request).execute().use { response ->
-                val body = response.body?.string() ?: throw Exception("Empty response")
+                val body = readProviderResponse(response, name)
                 val json = JSONObject(body)
                 if (json.has("message")) {
                     json.getJSONObject("message").getString("content")
@@ -343,7 +364,7 @@ class CustomProvider(
             }
             
             HttpClient.client.newCall(builder.build()).execute().use { response ->
-                val body = response.body?.string() ?: throw Exception("Empty response")
+                val body = readProviderResponse(response, name)
                 val json = JSONObject(body)
                 if (json.has("choices")) {
                     json.getJSONArray("choices")
