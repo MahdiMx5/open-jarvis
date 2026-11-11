@@ -49,7 +49,7 @@ jobs:
           python - <<'PY'
           from pathlib import Path
           data = Path("app/src/main/res/drawable/google_g_logo.png").read_bytes()
-          if not data.startswith(b"\\x89PNG\\r\\n\\x1a\\n"):
+          if not data.startswith(b"\x89PNG\r\n\x1a\n"):
               raise SystemExit("Downloaded Google sign-in mark is not a valid PNG.")
           width = int.from_bytes(data[16:20], "big")
           height = int.from_bytes(data[20:24], "big")
