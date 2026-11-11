@@ -29,7 +29,6 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.openjarvis.R
 import com.openjarvis.agent.AgentCore
-import com.openjarvis.bridge.SocketServer
 import com.openjarvis.graphify.GraphifyRepository
 import com.openjarvis.local.MusicDownloadManager
 import com.openjarvis.graphify.nodes.TaskNode
@@ -55,7 +54,6 @@ class OverlayService : LifecycleService() {
     private lateinit var agentCore: AgentCore
     private lateinit var voiceManager: VoiceManager
     private lateinit var graphifyRepo: GraphifyRepository
-    private lateinit var socketServer: SocketServer
     private var stateCollectJob: Job? = null
     private var voiceCollectJob: Job? = null
     private var recentTaskItems by mutableStateOf(emptyList<TaskNode>())
@@ -83,7 +81,6 @@ class OverlayService : LifecycleService() {
             graphifyRepo = GraphifyRepository(applicationContext)
             agentCore = AgentCore(applicationContext)
             voiceManager = VoiceManager(applicationContext)
-            socketServer = SocketServer(applicationContext, agentCore, graphifyRepo)
         } catch (error: Exception) {
             Log.e(TAG, "Unable to initialize overlay service", error)
             stopForeground(STOP_FOREGROUND_REMOVE)
@@ -97,7 +94,6 @@ class OverlayService : LifecycleService() {
             initializeServices()
         }
 
-        socketServer.start()
 
         stateCollectJob = serviceScope.launch {
             agentCore.state.collect { state ->
@@ -274,7 +270,6 @@ class OverlayService : LifecycleService() {
                 .onFailure { Log.w(TAG, "Unable to remove floating overlay", it) }
             overlayView = null
         }
-        if (::socketServer.isInitialized) socketServer.stop()
         if (::voiceManager.isInitialized) voiceManager.release()
         super.onDestroy()
     }
