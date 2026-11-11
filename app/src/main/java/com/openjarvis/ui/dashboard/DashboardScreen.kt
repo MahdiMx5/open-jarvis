@@ -159,7 +159,7 @@ fun DashboardScreen(
     var showProfile by remember { mutableStateOf(false) }
     var profileName by remember { mutableStateOf(FirebaseAuth.getInstance().currentUser?.displayName.orEmpty()) }
     var profileStatus by remember { mutableStateOf<String?>(null) }
-    var profilePhotoUri by remember { mutableStateOf(prefs.getString("profile_photo_uri", null)?.let(Uri::parse)) }
+    var profilePhotoUri by remember { mutableStateOf(prefs.getString("profile_photo_uri", null)?.takeIf { it.isNotBlank() }?.let(Uri::parse)) }
     var profilePhotoBitmap by remember { mutableStateOf<Bitmap?>(null) }
     val profilePhotoPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
@@ -171,7 +171,7 @@ fun DashboardScreen(
     LaunchedEffect(profilePhotoUri) {
         val uri = profilePhotoUri
         profilePhotoBitmap = if (uri == null) null else withContext(Dispatchers.IO) {
-            runCatching { context.contentResolver.openInputStream(uri)?.use(BitmapFactory::decodeStream) }.getOrNull()
+            runCatching { context.contentResolver.openInputStream(uri)?.use { stream -> BitmapFactory.decodeStream(stream) } }.getOrNull()
         }
     }
     val listState = rememberLazyListState()
