@@ -77,7 +77,6 @@ fun SettingsScreen(
     var model by remember { mutableStateOf(initialModel) }
     var showBaseUrlField by remember { mutableStateOf(false) }
     var showProvidersDropdown by remember { mutableStateOf(false) }
-    var autoAiRouting by remember { mutableStateOf(context.getSharedPreferences("jarvis_prefs", android.content.Context.MODE_PRIVATE).getBoolean("auto_ai_routing", true)) }
     var showPassword by remember { mutableStateOf(false) }
     var lastSaved by remember { mutableStateOf(0L) }
     var savedVisible by remember { mutableStateOf(false) }
@@ -134,15 +133,14 @@ fun SettingsScreen(
                 
                 Spacer(modifier = Modifier.height(10.dp))
 
-                SettingsToggleRow(
-                    title = "انتخاب خودکار هوش مصنوعی",
-                    subtitle = "اولویت مدل‌ها بر اساس نوع درخواست؛ خاموش = مدل انتخاب‌شده",
-                    enabled = autoAiRouting,
-                    onToggle = {
-                        autoAiRouting = !autoAiRouting
-                        context.getSharedPreferences("jarvis_prefs", android.content.Context.MODE_PRIVATE)
-                            .edit().putBoolean("auto_ai_routing", autoAiRouting).apply()
-                    }
+                Text(
+                    text = "درخواست‌ها فقط به ارائه‌دهنده‌ای ارسال می‌شوند که خودت انتخاب کرده‌ای.",
+                    style = TextStyle(
+                        fontFamily = FontFamily.Default,
+                        fontWeight = FontWeight(400),
+                        fontSize = 11.sp,
+                        color = VoidColor.TextDisabled
+                    )
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))
