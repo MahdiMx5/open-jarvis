@@ -92,7 +92,7 @@ class PermissionCenterActivity : ComponentActivity() {
             OpenJarvisTheme {
                 PermissionCenterScreen(
                     refreshVersion = refreshVersion,
-                    items = permissionItems(),
+                    permissions = permissionItems(),
                     canStartVoice = hasMicrophonePermission() && hasOverlayPermission(),
                     onBack = { finish() },
                     onRequest = { id -> requestPermission(id) },
@@ -213,7 +213,7 @@ class PermissionCenterActivity : ComponentActivity() {
 @Composable
 private fun PermissionCenterScreen(
     refreshVersion: Int,
-    items: List<PermissionItem>,
+    permissions: List<PermissionItem>,
     canStartVoice: Boolean,
     onBack: () -> Unit,
     onRequest: (String) -> Unit,
@@ -258,7 +258,7 @@ private fun PermissionCenterScreen(
                         modifier = Modifier.weight(1f),
                         verticalArrangement = Arrangement.spacedBy(9.dp)
                     ) {
-                        items(items, key = { it.id }) { item ->
+                        items(permissions, key = { it.id }) { item ->
                             PermissionCard(item = item, onClick = { selected = item })
                         }
                     }
