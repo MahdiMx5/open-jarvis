@@ -72,7 +72,8 @@ private data class ChatColors(
     val muted: Color,
     val userBubble: Color,
     val assistantBubble: Color,
-    val border: Color
+    val border: Color,
+    val accent: Color
 )
 
 @Composable
@@ -98,13 +99,14 @@ fun DashboardScreen(
     val listState = rememberLazyListState()
 
     val colors = if (darkMode) ChatColors(
-        background = Color(0xFF101010),
-        surface = Color(0xFF1B1B1B),
+        background = Color(0xFF080D14),
+        surface = Color(0xFF101923),
         text = Color(0xFFF4F4F4),
-        muted = Color(0xFFAAAAAA),
-        userBubble = Color(0xFF303030),
-        assistantBubble = Color(0xFF171717),
-        border = Color(0xFF343434)
+        muted = Color(0xFF8293A5),
+        userBubble = Color(0xFF172431),
+        assistantBubble = Color(0xFF0D151E),
+        border = Color(0xFF2A3A47),
+        accent = Color(0xFF35D5E8)
     ) else ChatColors(
         background = Color(0xFFF7F7F7),
         surface = Color.White,
@@ -112,7 +114,8 @@ fun DashboardScreen(
         muted = Color(0xFF666666),
         userBubble = Color(0xFFEAEAEA),
         assistantBubble = Color(0xFFF7F7F7),
-        border = Color(0xFFE0E0E0)
+        border = Color(0xFFE0E0E0),
+        accent = Color(0xFF187F91)
     )
 
     fun refreshThreads() {
@@ -176,8 +179,8 @@ fun DashboardScreen(
                     }
                 }
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("Jarvis", color = colors.text, fontSize = 19.sp, fontWeight = FontWeight.SemiBold)
-                    Text("دستیار هوشمند", color = colors.muted, fontSize = 11.sp)
+                    Text("JARVIS", color = colors.text, fontSize = 18.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
+                    Text("دستیار هوشمند", color = colors.accent, fontSize = 11.sp, fontWeight = FontWeight.Medium)
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     IconButton(onClick = {
@@ -216,7 +219,7 @@ fun DashboardScreen(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        Text("سلام، من جارویسم.", color = colors.text, fontSize = 25.sp, fontWeight = FontWeight.SemiBold)
+                        Text("سلام، من جارویسم.", color = colors.text, fontSize = 25.sp, fontWeight = FontWeight.Bold)
                         Text(
                             "هر چیزی می‌خواهی بپرس یا بگو چه کاری برایت انجام بدهم.",
                             color = colors.muted,
@@ -273,7 +276,7 @@ fun DashboardScreen(
                         Icon(
                             Icons.Default.Send,
                             contentDescription = "ارسال",
-                            tint = if (input.isNotBlank() && !waitingForResponse) colors.text else colors.muted
+                            tint = if (input.isNotBlank() && !waitingForResponse) colors.accent else colors.muted
                         )
                     }
                 }
