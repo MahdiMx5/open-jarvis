@@ -275,7 +275,7 @@ fun DashboardScreen(
                 }
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Image(
-                        painter = painterResource(id = com.openjarvis.R.drawable.mx5_logo),
+                        painter = painterResource(id = com.openjarvis.R.drawable.mx5_mark),
                         contentDescription = "لوگوی MX5",
                         modifier = Modifier.size(28.dp),
                         contentScale = ContentScale.Fit
