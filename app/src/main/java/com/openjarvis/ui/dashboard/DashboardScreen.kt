@@ -229,7 +229,7 @@ fun DashboardScreen(
         attachedFileContent = null
         append("user", displayMessage)
         waitingForResponse = true
-        agent.executeTask(request, responseMode)
+        agent.executeTask(request, responseMode, tone)
     }
 
     LaunchedEffect(agentState) {
