@@ -98,6 +98,8 @@ fun DashboardScreen(
     val agentState by agent.state.collectAsState()
     var darkMode by remember { mutableStateOf(prefs.getBoolean("dark_mode", true)) }
     var tone by remember { mutableStateOf(prefs.getString("response_tone", "natural") ?: "natural") }
+    var responseMode by remember { mutableStateOf(prefs.getString("response_mode", "normal") ?: "normal") }
+    var showMode by remember { mutableStateOf(false) }
     var input by remember { mutableStateOf("") }
     var currentThreadId by remember { mutableStateOf(ChatStorage.currentThreadId(context)) }
     var messages by remember { mutableStateOf(ChatStorage.findThread(context, currentThreadId)?.messages ?: emptyList()) }
@@ -147,7 +149,7 @@ fun DashboardScreen(
         input = ""
         append("user", message)
         waitingForResponse = true
-        agent.executeTask(message)
+        agent.executeTask(message, responseMode)
     }
 
     LaunchedEffect(agentState) {
@@ -231,6 +233,25 @@ fun DashboardScreen(
                     },
                     color = colors.muted,
                     fontSize = 11.sp
+                )
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth().clickable { showMode = true }.padding(horizontal = 18.dp, vertical = 7.dp),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    "حالت هوش مصنوعی: " + when (responseMode) {
+                        "deep" -> "تحلیل عمیق"
+                        "code" -> "برنامه‌نویسی"
+                        "creative" -> "خلاقانه"
+                        "translate" -> "مترجم"
+                        "brief" -> "پاسخ سریع"
+                        else -> "استاندارد"
+                    } + "  ▾",
+                    color = colors.accent,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium
                 )
             }
 
@@ -383,6 +404,37 @@ fun DashboardScreen(
                     }) { Text("خروج از حساب") }
                 }
             }
+        )
+    }
+
+    if (showMode) {
+        AlertDialog(
+            onDismissRequest = { showMode = false },
+            containerColor = colors.surface,
+            title = { Text("انتخاب حالت هوش مصنوعی", color = colors.text) },
+            text = {
+                Column {
+                    listOf(
+                        "normal" to "استاندارد — گفت‌وگوی معمولی",
+                        "deep" to "تحلیل عمیق — بررسی دقیق و مرحله‌ای",
+                        "code" to "برنامه‌نویسی — کدنویسی و عیب‌یابی",
+                        "creative" to "خلاقانه — ایده‌پردازی و تولید محتوا",
+                        "translate" to "مترجم — ترجمه با حفظ لحن",
+                        "brief" to "پاسخ سریع — کوتاه و مستقیم"
+                    ).forEach { (key, label) ->
+                        Text(
+                            label,
+                            modifier = Modifier.fillMaxWidth().clickable {
+                                responseMode = key
+                                prefs.edit().putString("response_mode", key).apply()
+                                showMode = false
+                            }.padding(vertical = 12.dp),
+                            color = if (responseMode == key) colors.accent else colors.text
+                        )
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { showMode = false }) { Text("بستن") } }
         )
     }
 
