@@ -99,13 +99,7 @@ class UniversalAdapter(private val context: Context) {
         }
     }
 
-    fun clearProviderCredentials(name: String) {
-        val suffix = name.lowercase().replace(Regex("[^a-z0-9]+"), "_")
-        prefs.edit()
-            .remove("provider_${suffix}_api_key")
-            .remove("provider_api_key".takeIf { name == getProviderName() } .orEmpty())
-            .apply()
-    }
+
     
     fun getProviderName(): String = prefs.getString("provider_name", "Groq") ?: "Groq"
     
