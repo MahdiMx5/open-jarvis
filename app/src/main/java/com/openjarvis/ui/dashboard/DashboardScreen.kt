@@ -26,6 +26,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Mic
@@ -106,6 +110,8 @@ fun DashboardScreen(
     var threads by remember { mutableStateOf(ChatStorage.loadThreads(context)) }
     var waitingForResponse by remember { mutableStateOf(false) }
     var showHistory by remember { mutableStateOf(false) }
+    var historyQuery by remember { mutableStateOf("") }
+    var favoritesOnly by remember { mutableStateOf(false) }
     var showTone by remember { mutableStateOf(false) }
     var showProfile by remember { mutableStateOf(false) }
     var profileName by remember { mutableStateOf(FirebaseAuth.getInstance().currentUser?.displayName.orEmpty()) }
@@ -141,6 +147,12 @@ fun DashboardScreen(
         currentThreadId = thread.id
         messages = thread.messages
         refreshThreads()
+    }
+
+    val visibleThreads = threads.filter { thread ->
+        val matchesQuery = historyQuery.isBlank() || thread.title.contains(historyQuery, true) || thread.messages.any { it.text.contains(historyQuery, true) }
+        val matchesFavorite = !favoritesOnly || thread.messages.any { it.isFavorite }
+        matchesQuery && matchesFavorite
     }
 
     fun sendMessage() {
@@ -278,7 +290,30 @@ fun DashboardScreen(
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                         contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 14.dp, vertical = 16.dp)
                     ) {
-                        items(messages, key = { it.id }) { message -> MessageBubble(message, colors) }
+                        items(messages, key = { it.id }) { message ->
+                            MessageBubble(
+                                message = message,
+                                colors = colors,
+                                onFavorite = {
+                                    val threadId = currentThreadId
+                                    if (threadId != null) {
+                                        threads = ChatStorage.setMessageFavorite(context, threadId, message.id, !message.isFavorite)
+                                        messages = ChatStorage.findThread(context, threadId)?.messages ?: messages
+                                    }
+                                },
+                                onCopy = {
+                                    val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                                    clipboard.setPrimaryClip(android.content.ClipData.newPlainText("Open Mx5", message.text))
+                                },
+                                onShare = {
+                                    val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                        type = "text/plain"
+                                        putExtra(Intent.EXTRA_TEXT, message.text)
+                                    }
+                                    context.startActivity(Intent.createChooser(shareIntent, "اشتراک‌گذاری پاسخ"))
+                                }
+                            )
+                        }
                         if (waitingForResponse) {
                             item { Text("در حال فکر کردن…", color = colors.muted, fontSize = 12.sp, modifier = Modifier.padding(start = 12.dp)) }
                         }
@@ -335,8 +370,26 @@ fun DashboardScreen(
             title = { Text("گفت‌وگوهای قبلی", color = colors.text) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (threads.isEmpty()) Text("هنوز گفت‌وگویی ذخیره نشده.", color = colors.muted)
-                    threads.forEach { thread ->
+                    BasicTextField(
+                        value = historyQuery,
+                        onValueChange = { historyQuery = it },
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                        textStyle = TextStyle(color = colors.text, fontSize = 14.sp),
+                        decorationBox = { inner ->
+                            Box {
+                                if (historyQuery.isEmpty()) Text("جست‌وجو در عنوان و متن گفت‌وگوها…", color = colors.muted, fontSize = 13.sp)
+                                inner()
+                            }
+                        }
+                    )
+                    Text(
+                        if (favoritesOnly) "★ نمایش گفت‌وگوهای نشان‌شده (برای لغو لمس کن)" else "☆ نمایش گفت‌وگوهای نشان‌شده",
+                        color = colors.accent,
+                        modifier = Modifier.fillMaxWidth().clickable { favoritesOnly = !favoritesOnly }.padding(vertical = 6.dp),
+                        fontSize = 12.sp
+                    )
+                    if (visibleThreads.isEmpty()) Text("موردی پیدا نشد.", color = colors.muted)
+                    visibleThreads.forEach { thread ->
                         Column(
                             modifier = Modifier.fillMaxWidth().clickable {
                                 currentThreadId = thread.id
@@ -573,7 +626,13 @@ private fun ProfileInfoRow(label: String, value: String, colors: ChatColors) {
 }
 
 @Composable
-private fun MessageBubble(message: ChatMessage, colors: ChatColors) {
+private fun MessageBubble(
+    message: ChatMessage,
+    colors: ChatColors,
+    onFavorite: () -> Unit,
+    onCopy: () -> Unit,
+    onShare: () -> Unit
+) {
     val isUser = message.role == "user"
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -587,12 +646,36 @@ private fun MessageBubble(message: ChatMessage, colors: ChatColors) {
         ) {
             Column(Modifier.padding(horizontal = 14.dp, vertical = 11.dp)) {
                 Text(message.text, color = colors.text, fontSize = 14.sp, lineHeight = 22.sp)
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                    horizontalArrangement = Arrangement.Start,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = onCopy, modifier = Modifier.size(30.dp)) {
+                        Icon(Icons.Default.ContentCopy, contentDescription = "کپی متن", tint = colors.muted, modifier = Modifier.size(16.dp))
+                    }
+                    IconButton(onClick = onShare, modifier = Modifier.size(30.dp)) {
+                        Icon(Icons.Default.Share, contentDescription = "اشتراک‌گذاری متن", tint = colors.muted, modifier = Modifier.size(16.dp))
+                    }
+                    IconButton(onClick = onFavorite, modifier = Modifier.size(30.dp)) {
+                        Icon(
+                            if (message.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                            contentDescription = if (message.isFavorite) "حذف از نشان‌شده‌ها" else "افزودن به نشان‌شده‌ها",
+                            tint = if (message.isFavorite) colors.accent else colors.muted,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                    Spacer(Modifier.weight(1f))
+                    Text(formatTime(message.timestamp), color = colors.muted, fontSize = 10.sp)
+                }
+                /*
                 Text(
                     formatTime(message.timestamp),
                     color = colors.muted,
                     fontSize = 10.sp,
                     modifier = Modifier.align(Alignment.End).padding(top = 5.dp)
                 )
+                */
             }
         }
     }
