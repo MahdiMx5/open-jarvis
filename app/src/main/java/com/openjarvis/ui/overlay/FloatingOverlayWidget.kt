@@ -168,7 +168,7 @@ private fun CollapsedPill(
     )
 
     val statusColor = when (agentState) {
-        is AgentState.Idle -> VoidColor.Violet
+        is AgentState.Idle -> VoidColor.Cyan
         is AgentState.Running -> VoidColor.Cyan
         is AgentState.AwaitingConfirmation -> VoidColor.Cyan
         is AgentState.Done -> VoidColor.Green
@@ -188,7 +188,7 @@ private fun CollapsedPill(
     ) {
         Canvas(modifier = Modifier.fillMaxSize()) {
             drawRoundRect(
-                color = VoidColor.Violet.copy(alpha = glowAlpha),
+                color = VoidColor.Cyan.copy(alpha = glowAlpha),
                 style = Stroke(width = 1.dp.toPx()),
                 cornerRadius = CornerRadius(999.dp.toPx())
             )
@@ -275,14 +275,14 @@ private fun ExpandedOverlay(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(2.dp)
-                    .background(VoidColor.Violet)
+                    .background(VoidColor.Cyan)
             )
 
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(30.dp)
-                    .background(VoidColor.Violet.copy(alpha = 0.2f))
+                    .background(VoidColor.Cyan.copy(alpha = 0.2f))
             )
 
             Column(
@@ -371,7 +371,7 @@ private fun StatusOrb(state: AgentState) {
     )
 
     val color = when (state) {
-        is AgentState.Idle -> VoidColor.Violet
+        is AgentState.Idle -> VoidColor.Cyan
         is AgentState.Running -> VoidColor.Cyan
         is AgentState.AwaitingConfirmation -> VoidColor.Cyan
         is AgentState.Done -> VoidColor.Green
@@ -530,7 +530,7 @@ private fun InputRowWithVoice(
             style = TextStyle(
                 fontFamily = FontFamily.Monospace,
                 fontSize = 18.sp,
-                color = VoidColor.Violet
+                color = VoidColor.Cyan
             )
         )
 
@@ -571,7 +571,7 @@ private fun InputRowWithVoice(
 
         Spacer(modifier = Modifier.width(8.dp))
 
-        val sendButtonColor = if (commandText.isEmpty()) VoidColor.Void700 else VoidColor.Violet
+        val sendButtonColor = if (commandText.isEmpty()) VoidColor.Void700 else VoidColor.Cyan
 
         Surface(
             modifier = Modifier.size(36.dp),
