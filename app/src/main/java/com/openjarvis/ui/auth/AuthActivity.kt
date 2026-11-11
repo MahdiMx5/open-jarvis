@@ -82,7 +82,7 @@ class AuthActivity : AppCompatActivity() {
                             verticalArrangement = Arrangement.Center
                         ) {
                             Image(
-                                painter = painterResource(id = R.drawable.mx5_logo),
+                                painter = painterResource(id = R.drawable.mx5_mark),
                                 contentDescription = "Open Mx5 logo",
                                 modifier = Modifier
                                     .size(132.dp)
