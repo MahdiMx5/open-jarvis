@@ -60,6 +60,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.TextStyle
@@ -273,7 +274,13 @@ fun DashboardScreen(
                     }
                 }
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("JARVIS", color = colors.text, fontSize = 18.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
+                    Image(
+                        painter = painterResource(id = com.openjarvis.R.drawable.mx5_logo),
+                        contentDescription = "لوگوی MX5",
+                        modifier = Modifier.size(28.dp),
+                        contentScale = ContentScale.Fit
+                    )
+                    Text("MX5", color = colors.text, fontSize = 18.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
                     Text("دستیار هوشمند", color = colors.accent, fontSize = 11.sp, fontWeight = FontWeight.Medium)
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
