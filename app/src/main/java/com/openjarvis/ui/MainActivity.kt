@@ -1,18 +1,11 @@
 package com.openjarvis.ui
 
-import android.Manifest
 import android.content.Intent
-import android.content.pm.PackageManager
-import android.os.Build
 import android.os.Bundle
-import android.net.Uri
-import android.provider.Settings
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.core.app.ActivityCompat
-import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import com.openjarvis.graphify.GraphifyRepository
 import com.openjarvis.ui.dashboard.DashboardScreen
@@ -20,7 +13,6 @@ import com.openjarvis.ui.theme.OpenJarvisTheme
 
 class MainActivity : ComponentActivity() {
     private lateinit var graphifyRepo: GraphifyRepository
-    private var waitingForOverlayPermission = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -30,7 +22,8 @@ class MainActivity : ComponentActivity() {
         setContent {
             OpenJarvisTheme {
                 DashboardScreen(
-                    onStartOverlay = { startVoiceAssistant() },
+                    onStartOverlay = { openPermissionCenter() },
+                    onOpenPermissions = { openPermissionCenter() },
                     onOpenSettings = { startActivity(Intent(this, SettingsActivity::class.java)) },
                     graphifyRepo = graphifyRepo
                 )
@@ -38,13 +31,10 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun startVoiceAssistant() {
-        if (Build.VERSION.SDK_INT >= 33 &&
-            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
-        ) {
-            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.POST_NOTIFICATIONS), NOTIFICATION_PERMISSION_REQUEST)
-            return
-        }
+    private fun openPermissionCenter() {
+        startActivity(Intent(this, PermissionCenterActivity::class.java))
+    }
+}
         ensureMicrophonePermission()
     }
 
