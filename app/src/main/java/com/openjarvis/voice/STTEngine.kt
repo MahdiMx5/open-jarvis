@@ -4,6 +4,7 @@ interface STTEngine {
     fun startListening(onResult: (String?) -> Unit, onError: (String) -> Unit)
     fun stop(): String? // Returns transcribed text or null
     fun isListening(): Boolean
+    fun setSpeechDetectedListener(listener: (() -> Unit)?) {}
     fun release()
 }
 

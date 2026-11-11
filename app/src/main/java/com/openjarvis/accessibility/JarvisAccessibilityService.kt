@@ -16,7 +16,7 @@ class JarvisAccessibilityService : AccessibilityService() {
         instance = this
         
         val info = AccessibilityServiceInfo().apply {
-            eventTypes = AccessibilityEvent.TYPE_ALL_MASK
+            eventTypes = AccessibilityEvent.TYPES_ALL_MASK
             feedbackType = AccessibilityServiceInfo.FEEDBACK_GENERIC
             flags = AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS or 
                    AccessibilityServiceInfo.FLAG_REQUEST_ENHANCED_WEB_ACCESSIBILITY
@@ -36,11 +36,15 @@ class JarvisAccessibilityService : AccessibilityService() {
         super.onDestroy()
     }
 
-    fun openAppByPackage(packageName: String) {
-        val intent = packageManager.getLaunchIntentForPackage(packageName)
-        if (intent != null) {
+    fun openAppByPackage(packageName: String): Boolean {
+        if (packageName.isBlank()) return false
+        val intent = packageManager.getLaunchIntentForPackage(packageName) ?: return false
+        return try {
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             startActivity(intent)
+            true
+        } catch (_: Exception) {
+            false
         }
     }
 
@@ -56,8 +60,7 @@ class JarvisAccessibilityService : AccessibilityService() {
         for (app in apps) {
             val appLabel = app.loadLabel(pm).toString().lowercase()
             if (appLabel.contains(normalizedLabel) || normalizedLabel.contains(appLabel)) {
-                openAppByPackage(app.activityInfo.packageName)
-                return true
+                return openAppByPackage(app.activityInfo.packageName)
             }
         }
         return false
@@ -92,36 +95,47 @@ class JarvisAccessibilityService : AccessibilityService() {
         return false
     }
 
+    fun getActivePackageName(): String? {
+        val root = rootInActiveWindow ?: return null
+        return try {
+            root.packageName?.toString()
+        } finally {
+            root.recycle()
+        }
+    }
+
     fun pressBack() = performGlobalAction(GLOBAL_ACTION_BACK)
     fun pressHome() = performGlobalAction(GLOBAL_ACTION_HOME)
     fun pressRecents() = performGlobalAction(GLOBAL_ACTION_RECENTS)
 
     private fun findNodeByText(root: AccessibilityNodeInfo, text: String): AccessibilityNodeInfo? {
-        val normalizedText = text.lowercase()
-        
+        val normalizedText = text.trim().lowercase()
+        if (normalizedText.isEmpty()) return null
+
         val queue = ArrayDeque<AccessibilityNodeInfo>()
         queue.add(root)
-        
+
         while (queue.isNotEmpty()) {
             val node = queue.removeFirst()
-            
             val nodeText = node.text?.toString()?.lowercase()
             val contentDesc = node.contentDescription?.toString()?.lowercase()
-            
-            if (nodeText?.contains(normalizedText) == true || contentDesc?.contains(normalizedText) == true) {
-                if (node.isClickable && node.isVisibleToUser) {
-                    return node
-                }
+
+            if ((nodeText?.contains(normalizedText) == true ||
+                    contentDesc?.contains(normalizedText) == true) &&
+                node.isClickable && node.isVisibleToUser
+            ) {
+                val result = AccessibilityNodeInfo.obtain(node)
+                if (node !== root) node.recycle()
+                while (queue.isNotEmpty()) queue.removeFirst().recycle()
+                return result
             }
-            
+
             for (i in 0 until node.childCount) {
-                node.getChild(i)?.let { child ->
-                    queue.add(child)
-                }
+                node.getChild(i)?.let(queue::add)
             }
-            node.recycle()
+            if (node !== root) node.recycle()
         }
-        
+
         return null
     }
 

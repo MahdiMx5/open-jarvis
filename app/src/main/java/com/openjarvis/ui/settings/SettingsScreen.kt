@@ -11,15 +11,17 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
@@ -30,29 +32,62 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import android.content.Intent
+import android.provider.Settings
+import android.net.Uri
+import android.speech.SpeechRecognizer
+import com.openjarvis.BuildConfig
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.sp
 import com.openjarvis.llm.UniversalAdapter
+import com.openjarvis.voice.STTMode
+import com.openjarvis.voice.VoiceManager
 import com.openjarvis.ui.theme.VoidColor
+import com.openjarvis.ui.OverlayService
+
+data class ProviderFormSettings(
+    val baseUrl: String,
+    val apiKey: String,
+    val model: String
+)
 
 @Composable
 fun SettingsScreen(
     onNavigateBack: () -> Unit,
     onSaveProvider: (String, String, String, String) -> Unit,
+    onLoadProvider: (String) -> ProviderFormSettings,
+    onTestConnection: suspend () -> Result<Long>,
+    voiceManager: VoiceManager,
+    initialProviderName: String = "Groq",
+    initialBaseUrl: String = "",
+    initialApiKey: String = "",
+    initialModel: String = "openai/gpt-oss-20b",
     modifier: Modifier = Modifier
 ) {
-    var selectedProvider by remember { mutableStateOf("Groq") }
-    var baseUrl by remember { mutableStateOf("") }
-    var apiKey by remember { mutableStateOf("") }
-    var model by remember { mutableStateOf("llama-3.1-70b-versatile") }
+    val context = LocalContext.current
+    val speechRecognitionAvailable = remember { SpeechRecognizer.isRecognitionAvailable(context) }
+    var selectedProvider by remember { mutableStateOf(initialProviderName) }
+    var baseUrl by remember { mutableStateOf(initialBaseUrl) }
+    var apiKey by remember { mutableStateOf(initialApiKey) }
+    var model by remember { mutableStateOf(initialModel) }
     var showBaseUrlField by remember { mutableStateOf(false) }
     var showProvidersDropdown by remember { mutableStateOf(false) }
+    var autoAiRouting by remember { mutableStateOf(context.getSharedPreferences("jarvis_prefs", android.content.Context.MODE_PRIVATE).getBoolean("auto_ai_routing", true)) }
     var showPassword by remember { mutableStateOf(false) }
     var lastSaved by remember { mutableStateOf(0L) }
     var savedVisible by remember { mutableStateOf(false) }
-    var voiceEnabled by remember { mutableStateOf(false) }
-    var speakResults by remember { mutableStateOf(true) }
-    var speechRate by remember { mutableStateOf(1.05f) }
-    var sttMode by remember { mutableStateOf("Push to Talk") }
+    var voiceEnabled by remember { mutableStateOf(voiceManager.isVoiceEnabled()) }
+    var speakResults by remember { mutableStateOf(voiceManager.isSpeakResultsEnabled()) }
+    var speechRate by remember { mutableFloatStateOf(voiceManager.getSpeechRate()) }
+    var sttMode by remember { mutableStateOf(voiceManager.getSTTMode()) }
+    var recognitionLanguage by remember { mutableStateOf(voiceManager.getRecognitionLanguage()) }
+    var showLanguageMenu by remember { mutableStateOf(false) }
+    val sttModeLabel = if (sttMode == STTMode.PUSH_TO_TALK) "نگه‌داشتن میکروفون" else "پایان خودکار گفتار"
     
     LaunchedEffect(selectedProvider) {
         showBaseUrlField = selectedProvider == "Custom"
@@ -60,6 +95,7 @@ fun SettingsScreen(
     
     val scrollState = rememberScrollState()
     
+    androidx.compose.runtime.CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
     Box(
         modifier = modifier
             .fillMaxSize()
@@ -78,7 +114,7 @@ fun SettingsScreen(
                     .verticalScroll(scrollState)
                     .padding(horizontal = 24.dp, vertical = 16.dp)
             ) {
-                SectionLabel("AI PROVIDER")
+                SectionLabel("ارائه‌دهنده هوش مصنوعی")
                 
                 Spacer(modifier = Modifier.height(12.dp))
                 
@@ -87,13 +123,30 @@ fun SettingsScreen(
                     isExpanded = showProvidersDropdown,
                     onToggle = { showProvidersDropdown = !showProvidersDropdown },
                     onSelect = { provider ->
+                        val saved = onLoadProvider(provider)
                         selectedProvider = provider
+                        baseUrl = saved.baseUrl
+                        apiKey = saved.apiKey
+                        model = saved.model
                         showProvidersDropdown = false
                     }
                 )
                 
+                Spacer(modifier = Modifier.height(10.dp))
+
+                SettingsToggleRow(
+                    title = "انتخاب خودکار هوش مصنوعی",
+                    subtitle = "اولویت مدل‌ها بر اساس نوع درخواست؛ خاموش = مدل انتخاب‌شده",
+                    enabled = autoAiRouting,
+                    onToggle = {
+                        autoAiRouting = !autoAiRouting
+                        context.getSharedPreferences("jarvis_prefs", android.content.Context.MODE_PRIVATE)
+                            .edit().putBoolean("auto_ai_routing", autoAiRouting).apply()
+                    }
+                )
+
                 Spacer(modifier = Modifier.height(16.dp))
-                
+
                 FloatingLabelTextField(
                     value = baseUrl,
                     onValueChange = { baseUrl = it },
@@ -107,7 +160,8 @@ fun SettingsScreen(
                     onValueChange = { apiKey = it },
                     label = "API Key",
                     isFocused = false,
-                    isPassword = !showPassword,
+                    isPassword = true,
+                    showPassword = showPassword,
                     onTogglePassword = { showPassword = !showPassword }
                 )
                 
@@ -119,7 +173,7 @@ fun SettingsScreen(
                 )
                 
                 Text(
-                    text = "Works with any OpenAI-compatible API",
+                    text = "با سرویس‌های سازگار با OpenAI کار می‌کنه",
                     style = TextStyle(
                         fontFamily = FontFamily.Default,
                         fontWeight = FontWeight(400),
@@ -131,6 +185,7 @@ fun SettingsScreen(
                 Spacer(modifier = Modifier.height(24.dp))
                 
                 TestConnectionButton(
+                    provider = selectedProvider,
                     apiKey = apiKey,
                     baseUrl = baseUrl,
                     model = model,
@@ -138,30 +193,39 @@ fun SettingsScreen(
                         onSaveProvider(name, url, key, mdl)
                         lastSaved = System.currentTimeMillis()
                         savedVisible = true
-                    }
+                    },
+                    onTest = onTestConnection
                 )
                 
                 Spacer(modifier = Modifier.height(32.dp))
                 
-                SectionLabel("VOICE")
+                SectionLabel("صدا و زبان")
                 
                 Spacer(modifier = Modifier.height(12.dp))
                 
                 SettingsToggleRow(
-                    title = "Voice Assistant",
-                    subtitle = "Push to Talk · VAD supported",
+                    title = "دستیار صوتی",
+                    subtitle = "با میکروفون صحبت کن؛ فارسی و انگلیسی",
                     enabled = voiceEnabled,
-                    onToggle = { voiceEnabled = !voiceEnabled }
+                    onToggle = {
+                        voiceEnabled = !voiceEnabled
+                        voiceManager.setVoiceEnabled(voiceEnabled)
+                        OverlayService.syncVoicePreference(context, voiceEnabled)
+                    }
                 )
                 
                 if (voiceEnabled) {
                     Spacer(modifier = Modifier.height(8.dp))
                     
                     SettingsToggleRow(
-                        title = "Speak Results",
-                        subtitle = "Jarvis reads results aloud",
+                        title = "پاسخ صوتی",
+                        subtitle = "جارویس نتیجهٔ کارها رو با صدا می‌گه",
                         enabled = speakResults,
-                        onToggle = { speakResults = !speakResults }
+                        onToggle = {
+                            speakResults = !speakResults
+                            voiceManager.setSpeakResultsEnabled(speakResults)
+                            OverlayService.refreshRuntimeSettings(context)
+                        }
                     )
                     
                     Spacer(modifier = Modifier.height(8.dp))
@@ -177,14 +241,16 @@ fun SettingsScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clickable { 
-                                    sttMode = if (sttMode == "Push to Talk") "Auto (VAD)" else "Push to Talk"
+                                    sttMode = if (sttMode == STTMode.PUSH_TO_TALK) STTMode.AUTO_VAD else STTMode.PUSH_TO_TALK
+                                    voiceManager.setSTTMode(sttMode)
+                                    OverlayService.refreshRuntimeSettings(context)
                                 }
                                 .padding(16.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = "STT Mode",
+                                    text = "روش ضبط صدا",
                                     style = TextStyle(
                                         fontFamily = FontFamily.Default,
                                         fontWeight = FontWeight(500),
@@ -193,10 +259,10 @@ fun SettingsScreen(
                                     )
                                 )
                                 Text(
-                                    text = if (sttMode == "Push to Talk") 
-                                        "Hold mic to record, release to send" 
-                                    else 
-                                        "Tap to record, auto-sends on silence",
+                                    text = if (sttMode == STTMode.PUSH_TO_TALK)
+                                        "برای ضبط نگه دار و برای پایان رها کن"
+                                    else
+                                        "موتور تشخیص گفتار پس از مکث، گفتار را پایان می‌دهد",
                                     style = TextStyle(
                                         fontFamily = FontFamily.Default,
                                         fontWeight = FontWeight(400),
@@ -206,12 +272,12 @@ fun SettingsScreen(
                                 )
                             }
                             Text(
-                                text = sttMode,
+                                text = sttModeLabel,
                                 style = TextStyle(
                                     fontFamily = FontFamily.Default,
                                     fontWeight = FontWeight(500),
                                     fontSize = 12.sp,
-                                    color = VoidColor.Violet
+                                    color = VoidColor.Cyan
                                 )
                             )
                         }
@@ -219,6 +285,98 @@ fun SettingsScreen(
                     
                     Spacer(modifier = Modifier.height(8.dp))
                     
+                    Text(
+                        text = "سرعت صحبت: ${"%.2f".format(speechRate)}x",
+                        style = TextStyle(
+                            fontFamily = FontFamily.Default,
+                            fontSize = 12.sp,
+                            color = VoidColor.TextSecondary
+                        )
+                    )
+                    Slider(
+                        value = speechRate,
+                        onValueChange = {
+                            speechRate = it
+                            voiceManager.setSpeechRate(it)
+                            OverlayService.refreshRuntimeSettings(context)
+                        },
+                        valueRange = 0.5f..2.0f
+                    )
+
+                    Button(
+                        onClick = {
+                            val sample = when (recognitionLanguage) {
+                                "en-US" -> "Hello! I am Jarvis. How can I help you?"
+                                "en-AU" -> "G’day! I’m Jarvis. How can I help you today?"
+                                "es-ES" -> "¡Hola! Soy Jarvis. ¿Cómo puedo ayudarte?"
+                                "de-DE" -> "Hallo! Ich bin Jarvis. Wie kann ich dir helfen?"
+                                else -> "سلام! من جارویسم. چطوری؟"
+                            }
+                            voiceManager.testSpeak(sample)
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = VoidColor.CyanDim)
+                    ) {
+                        Text("تست صدای زبان انتخاب‌شده")
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Surface(
+                        shape = RoundedCornerShape(16.dp),
+                        color = VoidColor.Void900,
+                        border = BorderStroke(1.dp, VoidColor.BorderSubtle)
+                    ) {
+                        Column {
+                            Row(
+                                modifier = Modifier.fillMaxWidth().clickable {
+                                    showLanguageMenu = true
+                                }.padding(16.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(Modifier.weight(1f)) {
+                                    Text("زبان تشخیص و پاسخ صوتی", color = VoidColor.TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                                    Text("زبان گفتار ورودی و صدای خروجی جارویس", color = VoidColor.TextDisabled, fontSize = 11.sp)
+                                }
+                                Text(
+                                    when (recognitionLanguage) {
+                                        "en-US" -> "English (US)"
+                                        "en-AU" -> "English (Australia)"
+                                        "es-ES" -> "Español"
+                                        "de-DE" -> "Deutsch"
+                                        else -> "فارسی"
+                                    },
+                                    color = VoidColor.Cyan,
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                            DropdownMenu(
+                                expanded = showLanguageMenu,
+                                onDismissRequest = { showLanguageMenu = false }
+                            ) {
+                                listOf(
+                                    "fa-IR" to "فارسی",
+                                    "en-US" to "English (US)",
+                                    "en-AU" to "English (Australia)",
+                                    "es-ES" to "Español (España)",
+                                    "de-DE" to "Deutsch"
+                                ).forEach { (tag, label) ->
+                                    DropdownMenuItem(
+                                        text = { Text(label) },
+                                        onClick = {
+                                            recognitionLanguage = tag
+                                            voiceManager.setRecognitionLanguage(tag)
+                                            OverlayService.refreshRuntimeSettings(context)
+                                            showLanguageMenu = false
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+
                     // Model status
                     Surface(
                         modifier = Modifier.fillMaxWidth(),
@@ -239,7 +397,7 @@ fun SettingsScreen(
                             Spacer(modifier = Modifier.width(12.dp))
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = "Speech Recognition",
+                                    text = "تشخیص گفتار",
                                     style = TextStyle(
                                         fontFamily = FontFamily.Default,
                                         fontWeight = FontWeight(500),
@@ -248,7 +406,7 @@ fun SettingsScreen(
                                     )
                                 )
                                 Text(
-                                    text = "Google Speech · Online",
+                                    text = "موتور گفتار نصب‌شده روی دستگاه",
                                     style = TextStyle(
                                         fontFamily = FontFamily.Default,
                                         fontWeight = FontWeight(400),
@@ -258,7 +416,7 @@ fun SettingsScreen(
                                 )
                             }
                             Text(
-                                text = "Ready",
+                                text = if (speechRecognitionAvailable) "آماده" else "در دسترس نیست",
                                 style = TextStyle(
                                     fontFamily = FontFamily.Default,
                                     fontWeight = FontWeight(500),
@@ -272,25 +430,15 @@ fun SettingsScreen(
                 
                 Spacer(modifier = Modifier.height(32.dp))
                 
-                SectionLabel("PERMISSIONS")
+                SectionLabel("دسترسی‌ها")
                 
                 Spacer(modifier = Modifier.height(12.dp))
                 
-                PermissionRow(
-                    title = "Accessibility",
-                    subtitle = "Required — Tap to enable"
-                )
-                
-                Spacer(modifier = Modifier.height(12.dp))
-                
-                PermissionRow(
-                    title = "Overlay",
-                    subtitle = "Required — Tap to enable"
-                )
-                
+                PermissionStatusRows()
+
                 Spacer(modifier = Modifier.height(32.dp))
-                
-                SectionLabel("ABOUT")
+
+                SectionLabel("درباره برنامه")
                 
                 Spacer(modifier = Modifier.height(12.dp))
                 
@@ -309,6 +457,7 @@ fun SettingsScreen(
                 .padding(16.dp)
         )
     }
+    }
 }
 
 @Composable
@@ -322,14 +471,14 @@ private fun SettingsHeader(onNavigateBack: () -> Unit) {
     ) {
         IconButton(onClick = onNavigateBack) {
             Icon(
-                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
-                contentDescription = "Back",
+                imageVector = Icons.Filled.KeyboardArrowLeft,
+                contentDescription = "بازگشت",
                 tint = VoidColor.TextSecondary
             )
         }
         
         Text(
-            text = "Settings",
+            text = "تنظیمات",
             style = TextStyle(
                 fontFamily = FontFamily.Default,
                 fontWeight = FontWeight(600),
@@ -410,7 +559,7 @@ private fun ProviderSelectorCard(
             )
             
             Icon(
-                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                imageVector = Icons.Filled.KeyboardArrowRight,
                 contentDescription = null,
                 tint = VoidColor.TextDisabled,
                 modifier = Modifier.graphicsLayer(rotationZ = rotationAngle)
@@ -445,20 +594,20 @@ private fun ProviderSelectorCard(
 @Composable
 private fun ProviderDot(provider: String) {
     val colors = mapOf(
-        "Groq" to VoidColor.Violet,
+        "Groq" to VoidColor.Cyan,
         "Google Gemini" to VoidColor.Cyan,
         "OpenRouter" to VoidColor.Green,
         "Anthropic Claude" to VoidColor.Amber,
         "OpenAI" to VoidColor.Green,
         "Ollama (Local)" to VoidColor.Cyan,
-        "Custom" to VoidColor.Violet
+        "Custom" to VoidColor.Cyan
     )
     
     Box(
         modifier = Modifier
             .size(8.dp)
             .clip(RoundedCornerShape(4.dp))
-            .background(colors[provider] ?: VoidColor.Violet)
+            .background(colors[provider] ?: VoidColor.Cyan)
     )
 }
 
@@ -480,7 +629,7 @@ private fun ProviderOption(
                 modifier = Modifier
                     .width(3.dp)
                     .height(16.dp)
-                    .background(VoidColor.Violet)
+                    .background(VoidColor.Cyan)
             )
             
             Spacer(modifier = Modifier.width(12.dp))
@@ -494,7 +643,7 @@ private fun ProviderOption(
                 fontFamily = FontFamily.Default,
                 fontWeight = FontWeight(500),
                 fontSize = 14.sp,
-                color = if (isSelected) VoidColor.Violet else VoidColor.TextPrimary
+                color = if (isSelected) VoidColor.Cyan else VoidColor.TextPrimary
             )
         )
     }
@@ -507,6 +656,7 @@ fun FloatingLabelTextField(
     label: String,
     isFocused: Boolean,
     isPassword: Boolean = false,
+    showPassword: Boolean = false,
     visible: Boolean = true,
     onTogglePassword: (() -> Unit)? = null
 ) {
@@ -523,7 +673,7 @@ fun FloatingLabelTextField(
     )
     
     val borderColor by animateColorAsState(
-        targetValue = if (isFocused) VoidColor.Violet else VoidColor.BorderSubtle,
+        targetValue = if (isFocused) VoidColor.Cyan else VoidColor.BorderSubtle,
         animationSpec = tween(200),
         label = "border"
     )
@@ -575,17 +725,24 @@ fun FloatingLabelTextField(
 
 @Composable
 private fun TestConnectionButton(
+    provider: String,
     apiKey: String,
     baseUrl: String,
     model: String,
-    onSave: (String, String, String, String) -> Unit
+    onSave: (String, String, String, String) -> Unit,
+    onTest: suspend () -> Result<Long>
 ) {
     var testState by remember { mutableStateOf<TestState>(TestState.Idle) }
+    val coroutineScope = rememberCoroutineScope()
+
+    LaunchedEffect(provider) {
+        testState = TestState.Idle
+    }
     
     val borderColor by animateColorAsState(
         targetValue = when (testState) {
-            is TestState.Idle -> VoidColor.VioletDim
-            is TestState.Loading -> VoidColor.Violet
+            is TestState.Idle -> VoidColor.CyanDim
+            is TestState.Loading -> VoidColor.Cyan
             is TestState.Success -> VoidColor.Green
             is TestState.Error -> VoidColor.Red
         },
@@ -594,17 +751,31 @@ private fun TestConnectionButton(
     )
     
     val textColor = when (testState) {
-        is TestState.Idle -> VoidColor.Violet
-        is TestState.Loading -> VoidColor.Violet
+        is TestState.Idle -> VoidColor.Cyan
+        is TestState.Loading -> VoidColor.Cyan
         is TestState.Success -> VoidColor.Green
         is TestState.Error -> VoidColor.Red
     }
     
     OutlinedButton(
         onClick = {
-            onSave("Groq", baseUrl, apiKey, model)
-            testState = TestState.Success(150)
+            when {
+                provider == "Custom" && baseUrl.isBlank() -> testState = TestState.Error("Base URL is required")
+                provider == "Ollama (Local)" && baseUrl.isBlank() -> testState = TestState.Error("Base URL is required")
+                provider != "Ollama (Local)" && provider != "Custom" && apiKey.isBlank() -> testState = TestState.Error("API key is required")
+                else -> {
+                    onSave(provider, baseUrl, apiKey, model)
+                    coroutineScope.launch {
+                        testState = TestState.Loading
+                        testState = onTest().fold(
+                            onSuccess = { TestState.Success(it) },
+                            onFailure = { TestState.Error(it.message ?: "Connection failed") }
+                        )
+                    }
+                }
+            }
         },
+        enabled = testState !is TestState.Loading,
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
         border = BorderStroke(1.dp, borderColor),
@@ -617,7 +788,7 @@ private fun TestConnectionButton(
             is TestState.Loading -> CircularProgressIndicator(
                 modifier = Modifier.size(16.dp),
                 strokeWidth = 2.dp,
-                color = VoidColor.Violet
+                color = VoidColor.Cyan
             )
             is TestState.Success -> {
                 Icon(Icons.Default.Check, contentDescription = null)
@@ -625,7 +796,7 @@ private fun TestConnectionButton(
                 Text("Connected — ${state.ms}ms")
             }
             is TestState.Error -> {
-                Text("Failed — check key")
+                Text("Failed: ${state.message}")
             }
         }
     }
@@ -699,7 +870,7 @@ private fun SettingsToggleRow(
                 enabled = onToggle != null,
                 colors = SwitchDefaults.colors(
                     checkedThumbColor = VoidColor.TextPrimary,
-                    checkedTrackColor = VoidColor.Violet,
+                    checkedTrackColor = VoidColor.Cyan,
                     uncheckedThumbColor = VoidColor.TextDisabled,
                     uncheckedTrackColor = VoidColor.Void600
                 )
@@ -709,16 +880,73 @@ private fun SettingsToggleRow(
 }
 
 @Composable
+private fun PermissionStatusRows() {
+    val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+    var refreshKey by remember { mutableIntStateOf(0) }
+
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) refreshKey++
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    val accessibilityGranted = remember(refreshKey) {
+        val enabled = Settings.Secure.getString(
+            context.contentResolver,
+            Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
+        ).orEmpty()
+        enabled.split(':').any {
+            it.contains("com.openjarvis.accessibility.JarvisAccessibilityService", ignoreCase = true)
+        }
+    }
+
+    val overlayGranted = remember(refreshKey) {
+        Settings.canDrawOverlays(context)
+    }
+
+    PermissionRow(
+        title = "دسترسی‌پذیری",
+        subtitle = if (accessibilityGranted) "فعال است" else "برای کنترل برنامه‌ها لازم است — لمس کن",
+        isGranted = accessibilityGranted,
+        onClick = {
+            context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+        }
+    )
+
+    Spacer(modifier = Modifier.height(12.dp))
+
+    PermissionRow(
+        title = "نمایش روی برنامه‌ها",
+        subtitle = if (overlayGranted) "فعال است" else "برای پنجره شناور لازم است — لمس کن",
+        isGranted = overlayGranted,
+        onClick = {
+            context.startActivity(
+                Intent(
+                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                    Uri.parse("package:${context.packageName}")
+                )
+            )
+        }
+    )
+}
+
+@Composable
 private fun PermissionRow(
     title: String,
-    subtitle: String
+    subtitle: String,
+    isGranted: Boolean,
+    onClick: () -> Unit
 ) {
-    val isGranted by remember { mutableStateOf(false) }
-    
+    val statusColor = if (isGranted) VoidColor.Green else VoidColor.Red
+
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .height(64.dp),
+            .height(64.dp)
+            .clickable(onClick = onClick),
         shape = RoundedCornerShape(16.dp),
         color = VoidColor.Void900,
         border = BorderStroke(1.dp, VoidColor.BorderSubtle)
@@ -733,19 +961,19 @@ private fun PermissionRow(
                 modifier = Modifier
                     .size(36.dp)
                     .clip(RoundedCornerShape(8.dp))
-                    .background(VoidColor.Red.copy(alpha = 0.12f)),
+                    .background(statusColor.copy(alpha = 0.12f)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = Icons.Default.Check,
                     contentDescription = null,
-                    tint = VoidColor.Red,
+                    tint = statusColor,
                     modifier = Modifier.size(20.dp)
                 )
             }
-            
+
             Spacer(modifier = Modifier.width(16.dp))
-            
+
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = title,
@@ -762,15 +990,15 @@ private fun PermissionRow(
                         fontFamily = FontFamily.Default,
                         fontWeight = FontWeight(400),
                         fontSize = 11.sp,
-                        color = VoidColor.Red
+                        color = statusColor
                     )
                 )
             }
-            
+
             Icon(
-                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                imageVector = Icons.Filled.KeyboardArrowRight,
                 contentDescription = null,
-                tint = VoidColor.Red
+                tint = statusColor
             )
         }
     }
@@ -785,15 +1013,12 @@ private fun AboutSection() {
         border = BorderStroke(1.dp, VoidColor.BorderSubtle)
     ) {
         Column {
-            AboutRow(title = "Version", value = "M1.0 (build 1)")
+            AboutRow(title = "Version", value = "${BuildConfig.VERSION_NAME} (build ${BuildConfig.VERSION_CODE})")
             Divider(thickness = 1.dp, color = VoidColor.BorderSubtle)
             AboutRow(title = "License", value = "MIT Open Source")
             Divider(thickness = 1.dp, color = VoidColor.BorderSubtle)
-            AboutRow(title = "GitHub", value = "tokenarc/open-jarvis", isLink = true)
-            Divider(thickness = 1.dp, color = VoidColor.BorderSubtle)
-            
             Text(
-                text = "Built on Android · From Termux with love",
+                text = "Open Mx5",
                 style = TextStyle(
                     fontFamily = FontFamily.Default,
                     fontWeight = FontWeight(400),
@@ -814,9 +1039,17 @@ private fun AboutRow(
     value: String,
     isLink: Boolean = false
 ) {
+    val context = LocalContext.current
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .then(
+                if (isLink) Modifier.clickable {
+                    context.startActivity(
+                        Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/MahdiMx5/open-jarvis"))
+                    )
+                } else Modifier
+            )
             .padding(16.dp),
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
@@ -836,7 +1069,7 @@ private fun AboutRow(
                 fontFamily = FontFamily.Default,
                 fontWeight = FontWeight(400),
                 fontSize = 14.sp,
-                color = if (isLink) VoidColor.Violet else VoidColor.TextPrimary
+                color = if (isLink) VoidColor.Cyan else VoidColor.TextPrimary
             )
         )
     }

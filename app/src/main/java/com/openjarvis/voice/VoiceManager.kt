@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.cancel
 
 class VoiceManager(private val context: Context) {
 
@@ -20,6 +21,7 @@ class VoiceManager(private val context: Context) {
         private const val KEY_STT_MODE = "stt_mode"
         private const val KEY_SPEAK_RESULTS = "speak_results"
         private const val KEY_SPEECH_RATE = "speech_rate"
+        private const val KEY_RECOGNITION_LANGUAGE = "recognition_language"
     }
 
     private val masterKey = MasterKey.Builder(context)
@@ -52,6 +54,21 @@ class VoiceManager(private val context: Context) {
     init {
         // Apply saved settings
         ttsEngine.setSpeechRate(getSpeechRate())
+        sttEngine.setRecognitionLanguage(getRecognitionLanguage())
+        ttsEngine.setPreferredLanguage(getRecognitionLanguage())
+    }
+
+    fun initialize() { reloadSettings() }
+
+    /**
+     * Re-apply persisted voice preferences to the live engines.
+     * SettingsActivity and OverlayService own separate VoiceManager instances,
+     * so writing SharedPreferences alone does not update the running engines.
+     */
+    fun reloadSettings() {
+        ttsEngine.setSpeechRate(getSpeechRate())
+        sttEngine.setRecognitionLanguage(getRecognitionLanguage())
+        ttsEngine.setPreferredLanguage(getRecognitionLanguage())
     }
 
     fun isVoiceEnabled(): Boolean = prefs.getBoolean(KEY_VOICE_ENABLED, false)
@@ -79,7 +96,17 @@ class VoiceManager(private val context: Context) {
         prefs.edit().putBoolean(KEY_SPEAK_RESULTS, enabled).apply()
     }
 
-    fun getSpeechRate(): Float = prefs.getFloat(KEY_SPEECH_RATE, 1.05f)
+    fun getSpeechRate(): Float = prefs.getFloat(KEY_SPEECH_RATE, 0.96f)
+
+    fun getRecognitionLanguage(): String = prefs.getString(KEY_RECOGNITION_LANGUAGE, "fa-IR") ?: "fa-IR"
+
+    fun setRecognitionLanguage(languageTag: String) {
+        val supported = setOf("fa-IR", "en-US", "en-AU", "es-ES", "de-DE")
+        val safeLanguage = languageTag.takeIf { it in supported } ?: "fa-IR"
+        prefs.edit().putString(KEY_RECOGNITION_LANGUAGE, safeLanguage).apply()
+        sttEngine.setRecognitionLanguage(safeLanguage)
+        ttsEngine.setPreferredLanguage(safeLanguage)
+    }
 
     fun setSpeechRate(rate: Float) {
         prefs.edit().putFloat(KEY_SPEECH_RATE, rate.coerceIn(0.5f, 2.0f)).apply()
@@ -88,11 +115,6 @@ class VoiceManager(private val context: Context) {
 
     // Push-to-talk mode
     fun startListening() {
-        if (!isVoiceEnabled()) {
-            _state.value = VoiceState.Error("Voice disabled in settings")
-            return
-        }
-
         scope.launch {
             _state.value = VoiceState.Recording
 
@@ -100,9 +122,6 @@ class VoiceManager(private val context: Context) {
                 onResult = { text ->
                     if (!text.isNullOrBlank()) {
                         _state.value = VoiceState.Result(text)
-                        if (isSpeakResultsEnabled()) {
-                            ttsEngine.speak("Heard: $text")
-                        }
                     } else {
                         _state.value = VoiceState.Error("Could not understand audio")
                     }
@@ -132,17 +151,14 @@ class VoiceManager(private val context: Context) {
         }
 
         scope.launch {
+            // Android SpeechRecognizer performs its own end-of-speech detection.
+            // This is not a continuous microphone VAD implementation.
             _state.value = VoiceState.Recording
-            _state.value = VoiceState.Transcribing
 
-            // For now, use simple push-to-talk with Android's built-in VAD
             sttEngine.startListening(
                 onResult = { text ->
                     if (!text.isNullOrBlank()) {
                         _state.value = VoiceState.Result(text)
-                        if (isSpeakResultsEnabled()) {
-                            ttsEngine.speak("Heard: $text")
-                        }
                     } else {
                         _state.value = VoiceState.Idle
                     }
@@ -154,10 +170,16 @@ class VoiceManager(private val context: Context) {
         }
     }
 
-    fun speak(text: String) {
-        if (isSpeakResultsEnabled()) {
-            ttsEngine.speak(text)
-        }
+    fun speak(text: String, onDone: (() -> Unit)? = null) {
+        if (isSpeakResultsEnabled()) ttsEngine.speak(text, onDone) else onDone?.invoke()
+    }
+
+    fun setSpeechDetectedListener(listener: (() -> Unit)?) {
+        sttEngine.setSpeechDetectedListener(listener)
+    }
+
+    fun testSpeak(text: String) {
+        ttsEngine.speak(text)
     }
 
     fun stopSpeaking() {

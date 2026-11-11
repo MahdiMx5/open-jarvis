@@ -21,28 +21,59 @@ class UniversalAdapter(private val context: Context) {
     )
     
     fun getActiveProvider(): LLMProvider {
-        val name = prefs.getString("provider_name", "Groq")
-        val baseUrl = prefs.getString("provider_base_url", "")
-        val apiKey = prefs.getString("provider_api_key", "")
-        val model = prefs.getString("provider_model", "")
-        
+        return getProviderForName(getProviderName())
+            ?: CustomProvider("", "", "")
+    }
+
+    fun getProviderForName(name: String): LLMProvider? {
+        val activeName = getProviderName()
+        val suffix = name.lowercase().replace(Regex("[^a-z0-9]+"), "_")
+        val useActiveSettings = name == activeName
+        val baseUrl = if (useActiveSettings) {
+            prefs.getString("provider_base_url", "") ?: ""
+        } else {
+            prefs.getString("provider_${suffix}_base_url", "") ?: ""
+        }
+        val apiKey = if (useActiveSettings) {
+            prefs.getString("provider_api_key", "") ?: ""
+        } else {
+            prefs.getString("provider_${suffix}_api_key", "") ?: ""
+        }
+        val model = if (useActiveSettings) {
+            prefs.getString("provider_model", "") ?: ""
+        } else {
+            prefs.getString("provider_${suffix}_model", "") ?: ""
+        }
+
         return when (name) {
-            "Groq" -> GroqProvider(apiKey, model)
-            "Google Gemini", "gemini" -> GeminiProvider(apiKey, model)
-            "OpenRouter" -> OpenRouterProvider(apiKey, model)
-            "Anthropic Claude" -> AnthropicProvider(apiKey, model)
-            "OpenAI" -> OpenAIProvider(apiKey, model)
-            "Ollama (Local)" -> OllamaProvider(baseUrl, model)
+            "Groq" -> GroqProvider(apiKey, model.ifBlank { getDefaultModel(name) })
+            "Google Gemini", "gemini" -> GeminiProvider(apiKey, model.ifBlank { getDefaultModel("Google Gemini") })
+            "OpenRouter" -> OpenRouterProvider(apiKey, model.ifBlank { getDefaultModel(name) })
+            "Anthropic Claude" -> AnthropicProvider(apiKey, model.ifBlank { getDefaultModel(name) })
+            "OpenAI" -> OpenAIProvider(apiKey, model.ifBlank { getDefaultModel(name) })
+            "Ollama (Local)" -> OllamaProvider(baseUrl, model.ifBlank { getDefaultModel(name) })
             "Local (LlamaCpp)" -> {
-                val mm = getModelManager(context)
-                val tier = mm.getDownloadedTier() ?: ModelManager.ModelTier.MINIMUM
-                LlamaProvider(mm.getModelPath(tier), tier.displayName)
+                val manager = getModelManager(context)
+                val tier = manager.getDownloadedTier() ?: return null
+                LlamaProvider(manager.getModelPath(tier), tier.displayName)
             }
             "Custom" -> CustomProvider(baseUrl, apiKey, model)
-            else -> CustomProvider(baseUrl, apiKey, model)
+            else -> null
         }
     }
-    
+
+    fun isProviderConfigured(name: String): Boolean {
+        val suffix = name.lowercase().replace(Regex("[^a-z0-9]+"), "_")
+        val active = name == getProviderName()
+        val key = if (active) prefs.getString("provider_api_key", "") else prefs.getString("provider_${suffix}_api_key", "")
+        val url = if (active) prefs.getString("provider_base_url", "") else prefs.getString("provider_${suffix}_base_url", "")
+        return when (name) {
+            "Local (LlamaCpp)" -> getModelManager(context).getDownloadedTier() != null
+            "Ollama (Local)", "Custom" -> !url.isNullOrBlank()
+            else -> !key.isNullOrBlank()
+        }
+    }
+
     suspend fun complete(
         systemPrompt: String,
         userMessage: String
@@ -72,7 +103,8 @@ class UniversalAdapter(private val context: Context) {
             "Anthropic Claude",
             "OpenAI",
             "Ollama (Local)",
-            "Local (LlamaCpp)"
+            "Local (LlamaCpp)",
+            "Custom"
         )
         
         fun getModelManager(context: Context): ModelManager {
@@ -82,7 +114,7 @@ class UniversalAdapter(private val context: Context) {
         }
         
         fun isLocalModelLoaded(): Boolean {
-            return modelManager?.state?.value is ModelManager.ModelState.ModelLoaded
+            return modelManager?.state?.value is ModelManager.ModelState.Loaded
         }
         
         suspend fun loadLocalModel(tier: ModelManager.ModelTier): Result<Unit> {
@@ -90,7 +122,7 @@ class UniversalAdapter(private val context: Context) {
         }
         
         fun getDefaultModel(provider: String): String = when (provider) {
-            "Groq" -> "llama-3.1-70b-versatile"
+            "Groq" -> "openai/gpt-oss-20b"
             "Google Gemini" -> "gemini-1.5-flash"
             "OpenRouter" -> "meta-llama/llama-3-8b-instruct:free"
             "Anthropic Claude" -> "claude-haiku-4-20250514"

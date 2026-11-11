@@ -1,17 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Open Jarvis</string>
-    <string name="accessibility_description">Open Jarvis uses accessibility to control your apps and perform actions on your device. This service is required for the AI agent to tap, type, and navigate apps.</string>
-    <string name="accessibility_service_label">Open Jarvis</string>
+    <string name="app_name">Open Mx5</string>
+    <string name="accessibility_description">Open Mx5 uses accessibility to control your apps and perform actions on your device. This service is required for the AI agent to tap, type, and navigate apps.</string>
+    <string name="accessibility_service_label">Open Mx5</string>
     <string name="notification_channel_name">Jarvis Assistant</string>
     <string name="notification_channel_description">Shows when Jarvis is active and listening for commands</string>
-    <string name="notification_title">Open Jarvis Active</string>
+    <string name="notification_title">Open Mx5 Active</string>
     <string name="notification_text">Tap to give a command</string>
     <string name="permission_required">Permission Required</string>
     <string name="enable_accessibility">Enable Accessibility Service</string>
     <string name="enable_overlay">Enable Overlay Permission</string>
     <string name="grant_permissions">Grant Permissions</string>
-    <string name="permissions_explained">Open Jarvis needs accessibility permissions to control apps and overlay permission to show the command button.</string>
+    <string name="permissions_explained">Open Mx5 needs accessibility permissions to control apps and overlay permission to show the command button.</string>
     <string name="jarvis_active">Jarvis is active</string>
     <string name="recent_tasks">Recent Tasks</string>
     <string name="settings">Settings</string>

@@ -1,642 +1,449 @@
 package com.openjarvis.ui.dashboard
 
-import androidx.compose.animation.*
-import androidx.compose.animation.core.*
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.LightMode
+import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Task
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.Security
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Divider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import android.app.Activity
+import android.content.Intent
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.UserProfileChangeRequest
+import com.openjarvis.ui.auth.AuthActivity
+import com.openjarvis.agent.AgentCore
+import com.openjarvis.agent.AgentState
 import com.openjarvis.graphify.GraphifyRepository
-import com.openjarvis.graphify.nodes.AppNode
-import com.openjarvis.graphify.nodes.TaskNode
-import com.openjarvis.ui.theme.VoidColor
-import kotlinx.coroutines.delay
+import com.openjarvis.ui.chat.ChatMessage
+import com.openjarvis.ui.chat.ChatStorage
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
-@OptIn(ExperimentalMaterial3Api::class)
+private data class ChatColors(
+    val background: Color,
+    val surface: Color,
+    val text: Color,
+    val muted: Color,
+    val userBubble: Color,
+    val assistantBubble: Color,
+    val border: Color,
+    val accent: Color
+)
+
 @Composable
 fun DashboardScreen(
     onStartOverlay: () -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenPermissions: () -> Unit,
     graphifyRepo: GraphifyRepository,
     modifier: Modifier = Modifier
 ) {
-    var recentTasks by remember { mutableStateOf<List<TaskNode>>(emptyList()) }
-    var mostUsedApps by remember { mutableStateOf<List<AppNode>>(emptyList()) }
-    var isSystemActive by remember { mutableStateOf(true) }
-    
-    var heroAlpha by remember { mutableFloatStateOf(0f) }
-    var statsAlpha by remember { mutableFloatStateOf(0f) }
-    var tasksAlpha by remember { mutableFloatStateOf(0f) }
-    var appsAlpha by remember { mutableFloatStateOf(0f) }
-    
-    LaunchedEffect(Unit) {
-        recentTasks = graphifyRepo.getRecentTasks(10)
-        mostUsedApps = graphifyRepo.getMostUsedApps(4)
-    }
-    
-    LaunchedEffect(Unit) {
-        heroAlpha = 1f
-        delay(150)
-        statsAlpha = 1f
-        delay(150)
-        tasksAlpha = 1f
-        delay(200)
-        appsAlpha = 1f
-    }
-    
-    val scrollState = rememberScrollState()
-    
-    Box(
-        modifier = modifier
-            .fillMaxSize()
-            .background(VoidColor.Void950)
-    ) {
-        OrbBackground()
-        
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .statusBarsPadding()
-                .verticalScroll(scrollState)
-                .padding(horizontal = 24.dp)
-        ) {
-            Spacer(modifier = Modifier.height(56.dp))
-            
-            HeroSection(isSystemActive = isSystemActive)
-            
-            Spacer(modifier = Modifier.height(16.dp))
-            
-            StatsRow(tasks = recentTasks, alpha = statsAlpha)
-            
-            Spacer(modifier = Modifier.height(24.dp))
-            
-            RecentTasksSection(tasks = recentTasks, alpha = tasksAlpha)
-            
-            Spacer(modifier = Modifier.height(24.dp))
-            
-            QuickAppsSection(apps = mostUsedApps, alpha = appsAlpha)
-            
-            Spacer(modifier = Modifier.height(32.dp))
-        }
-        
-        BottomNavBar(
-            onSettingsClick = onOpenSettings,
-            modifier = Modifier.align(Alignment.BottomCenter)
-        )
-    }
-}
+    val context = LocalContext.current
+    val prefs = remember { context.getSharedPreferences("jarvis_chat_history", android.content.Context.MODE_PRIVATE) }
+    val agent = remember { AgentCore(context.applicationContext) }
+    val agentState by agent.state.collectAsState()
+    var darkMode by remember { mutableStateOf(prefs.getBoolean("dark_mode", true)) }
+    var tone by remember { mutableStateOf(prefs.getString("response_tone", "natural") ?: "natural") }
+    var input by remember { mutableStateOf("") }
+    var currentThreadId by remember { mutableStateOf(ChatStorage.currentThreadId(context)) }
+    var messages by remember { mutableStateOf(ChatStorage.findThread(context, currentThreadId)?.messages ?: emptyList()) }
+    var threads by remember { mutableStateOf(ChatStorage.loadThreads(context)) }
+    var waitingForResponse by remember { mutableStateOf(false) }
+    var showHistory by remember { mutableStateOf(false) }
+    var showTone by remember { mutableStateOf(false) }
+    var showProfile by remember { mutableStateOf(false) }
+    var profileName by remember { mutableStateOf(FirebaseAuth.getInstance().currentUser?.displayName.orEmpty()) }
+    var profileStatus by remember { mutableStateOf<String?>(null) }
+    val listState = rememberLazyListState()
 
-@Composable
-private fun OrbBackground() {
-    val infiniteTransition = rememberInfiniteTransition(label = "orb")
-    
-    val offsetY by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = -20f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(8000, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "orb_y"
+    val colors = if (darkMode) ChatColors(
+        background = Color(0xFF080D14),
+        surface = Color(0xFF101923),
+        text = Color(0xFFF4F4F4),
+        muted = Color(0xFF8293A5),
+        userBubble = Color(0xFF172431),
+        assistantBubble = Color(0xFF0D151E),
+        border = Color(0xFF2A3A47),
+        accent = Color(0xFF35D5E8)
+    ) else ChatColors(
+        background = Color(0xFFF7F7F7),
+        surface = Color.White,
+        text = Color(0xFF171717),
+        muted = Color(0xFF666666),
+        userBubble = Color(0xFFEAEAEA),
+        assistantBubble = Color(0xFFF7F7F7),
+        border = Color(0xFFE0E0E0),
+        accent = Color(0xFF187F91)
     )
-    
-    Canvas(modifier = Modifier.fillMaxSize()) {
-        val center = Offset(size.width / 2, 200.dp.toPx() + offsetY.dp.toPx())
-        drawCircle(
-            brush = Brush.radialGradient(
-                colors = listOf(
-                    VoidColor.Violet.copy(alpha = 0.06f),
-                    Color.Transparent
-                ),
-                center = center,
-                radius = 200.dp.toPx()
-            ),
-            center = center,
-            radius = 200.dp.toPx()
-        )
-    }
-}
 
-@Composable
-private fun HeroSection(isSystemActive: Boolean) {
-    Column {
-        Surface(
-            shape = RoundedCornerShape(999.dp),
-            color = VoidColor.Void800,
-            border = androidx.compose.foundation.BorderStroke(1.dp, VoidColor.BorderGlow)
-        ) {
-            Text(
-                text = "AI AGENT v0.1",
-                style = TextStyle(
-                    fontFamily = FontFamily.Default,
-                    fontWeight = FontWeight(500),
-                    fontSize = 10.sp,
-                    letterSpacing = 4.sp,
-                    color = VoidColor.Violet
-                ),
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
-            )
-        }
-        
-        Spacer(modifier = Modifier.height(8.dp))
-        
-        val annotatedText = buildAnnotatedString {
-            withStyle(androidx.compose.ui.text.SpanStyle(color = VoidColor.TextPrimary)) {
-                append("OPEN")
-            }
-            append(" ")
-            withStyle(androidx.compose.ui.text.SpanStyle(
-                brush = Brush.linearGradient(
-                    colors = listOf(VoidColor.Violet, VoidColor.Cyan)
-                )
-            )) {
-                append("JARVIS")
+    fun refreshThreads() {
+        threads = ChatStorage.loadThreads(context)
+    }
+
+    fun append(role: String, text: String) {
+        val thread = ChatStorage.appendMessage(context, currentThreadId, role, text)
+        currentThreadId = thread.id
+        messages = thread.messages
+        refreshThreads()
+    }
+
+    fun sendMessage() {
+        val message = input.trim()
+        if (message.isEmpty() || waitingForResponse) return
+        input = ""
+        append("user", message)
+        waitingForResponse = true
+        agent.executeTask(message)
+    }
+
+    LaunchedEffect(agentState) {
+        if (waitingForResponse) {
+            when (val state = agentState) {
+                is AgentState.Done -> {
+                    append("assistant", state.result)
+                    waitingForResponse = false
+                }
+                is AgentState.Error -> {
+                    append("assistant", state.message)
+                    waitingForResponse = false
+                }
+                else -> Unit
             }
         }
-        
-        Text(
-            text = annotatedText,
-            style = TextStyle(
-                fontFamily = FontFamily.Default,
-                fontWeight = FontWeight(700),
-                fontSize = 38.sp,
-                letterSpacing = (-0.5).sp
-            )
-        )
-        
-        Text(
-            text = "Your device. Your commands.",
-            style = TextStyle(
-                fontFamily = FontFamily.Default,
-                fontWeight = FontWeight(400),
-                fontSize = 13.sp,
-                color = VoidColor.TextDisabled
-            )
-        )
-        
-        Spacer(modifier = Modifier.height(16.dp))
-        
-        StatusBadge(isActive = isSystemActive)
     }
-}
 
-@Composable
-private fun StatusBadge(isActive: Boolean) {
-    val infiniteTransition = rememberInfiniteTransition(label = "badge")
-    
-    val dotScale by infiniteTransition.animateFloat(
-        initialValue = 0.7f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1500, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "dot_scale"
-    )
-    
-    val (bgColor, borderColor, textColor, dotColor) = if (isActive) {
-        listOf(
-            VoidColor.Green.copy(alpha = 0.08f),
-            VoidColor.Green.copy(alpha = 0.25f),
-            VoidColor.Green,
-            VoidColor.Green
-        )
-    } else {
-        listOf(
-            VoidColor.Red.copy(alpha = 0.08f),
-            VoidColor.Red.copy(alpha = 0.25f),
-            VoidColor.Red,
-            VoidColor.Red
-        )
+    LaunchedEffect(messages.size) {
+        if (messages.isNotEmpty()) listState.animateScrollToItem(messages.lastIndex)
     }
-    
-    Surface(
-        shape = RoundedCornerShape(999.dp),
-        color = bgColor,
-        border = androidx.compose.foundation.BorderStroke(1.dp, borderColor)
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(6.dp)
-                    .scale(if (isActive) dotScale else 1f)
+
+    androidx.compose.runtime.CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+        Column(modifier = modifier.fillMaxSize().background(colors.background).statusBarsPadding().navigationBarsPadding().imePadding()) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 9.dp, vertical = 5.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Canvas(modifier = Modifier.fillMaxSize()) {
-                    drawCircle(color = dotColor)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = { showHistory = true }) {
+                        Icon(Icons.Default.History, contentDescription = "تاریخچه", tint = colors.text)
+                    }
+                    IconButton(onClick = {
+                        currentThreadId = null
+                        ChatStorage.setCurrentThreadId(context, null)
+                        messages = emptyList()
+                        input = ""
+                    }) {
+                        Icon(Icons.Default.Add, contentDescription = "چت جدید", tint = colors.text)
+                    }
+                }
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("JARVIS", color = colors.text, fontSize = 18.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
+                    Text("دستیار هوشمند", color = colors.accent, fontSize = 11.sp, fontWeight = FontWeight.Medium)
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = {
+                        darkMode = !darkMode
+                        prefs.edit().putBoolean("dark_mode", darkMode).apply()
+                    }) {
+                        Icon(if (darkMode) Icons.Default.LightMode else Icons.Default.DarkMode, contentDescription = "تغییر پوسته", tint = colors.text)
+                    }
+                    IconButton(onClick = {
+                        profileName = FirebaseAuth.getInstance().currentUser?.displayName.orEmpty()
+                        profileStatus = null
+                        showProfile = true
+                    }) {
+                        Icon(Icons.Default.AccountCircle, contentDescription = "پروفایل", tint = colors.text)
+                    }
+                    IconButton(onClick = onOpenPermissions) {
+                        Icon(Icons.Default.Security, contentDescription = "مجوزها", tint = colors.text)
+                    }
+                    IconButton(onClick = onOpenSettings) {
+                        Icon(Icons.Default.Settings, contentDescription = "تنظیمات", tint = colors.text)
+                    }
                 }
             }
-            
-            Spacer(modifier = Modifier.width(8.dp))
-            
-            Text(
-                text = if (isActive) "System Active" else "Tap to Activate",
-                style = TextStyle(
-                    fontFamily = FontFamily.Default,
-                    fontWeight = FontWeight(500),
-                    fontSize = 12.sp,
-                    color = textColor
+            Divider(color = colors.border)
+            Row(
+                modifier = Modifier.fillMaxWidth().clickable { showTone = true }.padding(horizontal = 18.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    "لحن پاسخ: " + when (tone) {
+                        "concise" -> "کوتاه"
+                        "formal" -> "رسمی"
+                        "friendly" -> "دوستانه"
+                        else -> "طبیعی"
+                    },
+                    color = colors.muted,
+                    fontSize = 11.sp
                 )
-            )
-        }
-    }
-}
-
-@Composable
-private fun StatsRow(tasks: List<TaskNode>, alpha: Float) {
-    val animatedCount by animateIntAsState(
-        targetValue = tasks.size.coerceAtLeast(0),
-        animationSpec = tween(500, easing = EaseOutQuart),
-        label = "count"
-    )
-    
-    Column(alpha = alpha) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            StatCard(
-                count = animatedCount,
-                label = "Tasks Done",
-                modifier = Modifier.weight(1f)
-            )
-            StatCard(
-                count = 0,
-                label = "Apps Used",
-                modifier = Modifier.weight(1f)
-            )
-            StatCard(
-                count = 0,
-                label = "Patterns",
-                modifier = Modifier.weight(1f)
-            )
-        }
-    }
-}
-
-@Composable
-private fun StatCard(count: Int, label: String, modifier: Modifier = Modifier) {
-    Surface(
-        modifier = modifier.height(72.dp),
-        shape = RoundedCornerShape(14.dp),
-        color = VoidColor.Void800,
-        border = androidx.compose.foundation.BorderStroke(1.dp, VoidColor.BorderSubtle)
-    ) {
-        Column(
-            modifier = Modifier.padding(12.dp),
-            verticalArrangement = Arrangement.Center
-        ) {
-            Text(
-                text = count.toString(),
-                style = TextStyle(
-                    fontFamily = FontFamily.Default,
-                    fontWeight = FontWeight(700),
-                    fontSize = 22.sp,
-                    color = VoidColor.TextPrimary
-                )
-            )
-            Text(
-                text = label,
-                style = TextStyle(
-                    fontFamily = FontFamily.Default,
-                    fontWeight = FontWeight(400),
-                    fontSize = 11.sp,
-                    color = VoidColor.TextDisabled
-                )
-            )
-        }
-    }
-}
-
-@Composable
-private fun RecentTasksSection(tasks: List<TaskNode>, alpha: Float) {
-    Column(alpha = alpha) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Text(
-                text = "RECENT TASKS",
-                style = TextStyle(
-                    fontFamily = FontFamily.Default,
-                    fontWeight = FontWeight(600),
-                    fontSize = 10.sp,
-                    letterSpacing = 3.sp,
-                    color = VoidColor.TextDisabled
-                )
-            )
-            Text(
-                text = "see all →",
-                style = TextStyle(
-                    fontFamily = FontFamily.Default,
-                    fontWeight = FontWeight(500),
-                    fontSize = 11.sp,
-                    color = VoidColor.Violet
-                )
-            )
-        }
-        
-        Spacer(modifier = Modifier.height(12.dp))
-        
-        if (tasks.isEmpty()) {
-            Text(
-                text = "No tasks yet. Try opening an app!",
-                style = TextStyle(
-                    fontFamily = FontFamily.Default,
-                    fontWeight = FontWeight(400),
-                    fontSize = 13.sp,
-                    color = VoidColor.TextDisabled
-                )
-            )
-        } else {
-            tasks.take(5).forEachIndexed { index, task ->
-                TaskCard(task = task)
-                Spacer(modifier = Modifier.height(10.dp))
             }
-        }
-    }
-}
 
-@Composable
-private fun TaskCard(task: TaskNode) {
-    val isSuccess = task.result.contains("Opened") || task.result.contains("Success")
-    val outcomeColor = if (isSuccess) VoidColor.Green else VoidColor.Red
-    
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(72.dp),
-        shape = RoundedCornerShape(16.dp),
-        color = VoidColor.Void900,
-        border = androidx.compose.foundation.BorderStroke(1.dp, VoidColor.BorderSubtle)
-    ) {
-        Row(modifier = Modifier.fillMaxSize()) {
-            Box(
-                modifier = Modifier
-                    .width(4.dp)
-                    .fillMaxHeight()
-                    .background(
-                        color = outcomeColor,
-                        shape = RoundedCornerShape(topStart = 16.dp, bottomStart = 16.dp)
-                    )
-            )
-            
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(12.dp),
-                verticalArrangement = Arrangement.Center
+            Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                if (messages.isEmpty()) {
+                    Column(
+                        modifier = Modifier.align(Alignment.Center).padding(horizontal = 28.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Text("سلام، من جارویسم.", color = colors.text, fontSize = 25.sp, fontWeight = FontWeight.Bold)
+                        Text(
+                            "هر چیزی می‌خواهی بپرس یا بگو چه کاری برایت انجام بدهم.",
+                            color = colors.muted,
+                            fontSize = 14.sp,
+                            textAlign = TextAlign.Center,
+                            lineHeight = 22.sp
+                        )
+                    }
+                } else {
+                    LazyColumn(
+                        state = listState,
+                        modifier = Modifier.fillMaxSize(),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 14.dp, vertical = 16.dp)
+                    ) {
+                        items(messages, key = { it.id }) { message -> MessageBubble(message, colors) }
+                        if (waitingForResponse) {
+                            item { Text("در حال فکر کردن…", color = colors.muted, fontSize = 12.sp, modifier = Modifier.padding(start = 12.dp)) }
+                        }
+                    }
+                }
+            }
+
+            Surface(
+                color = colors.surface,
+                border = androidx.compose.foundation.BorderStroke(1.dp, colors.border),
+                shape = RoundedCornerShape(24.dp),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp)
             ) {
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 7.dp),
+                    verticalAlignment = Alignment.Bottom,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    Text(
-                        text = task.command,
-                        style = TextStyle(
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 12.sp,
-                            color = VoidColor.TextPrimary
-                        ),
-                        maxLines = 1,
-                        modifier = Modifier.weight(1f)
-                    )
-                    
-                    Text(
-                        text = formatRelativeTime(task.timestamp),
-                        style = TextStyle(
-                            fontFamily = FontFamily.Default,
-                            fontSize = 10.sp,
-                            color = VoidColor.TextDisabled
-                        )
-                    )
-                }
-                
-                Spacer(modifier = Modifier.height(8.dp))
-                
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    AppInitialBadge(label = task.command)
-                    
-                    Spacer(modifier = Modifier.width(8.dp))
-                    
-                    Text(
-                        text = "System App",
-                        style = TextStyle(
-                            fontFamily = FontFamily.Default,
-                            fontSize = 11.sp,
-                            color = VoidColor.TextDisabled
-                        )
-                    )
-                    
-                    Spacer(modifier = Modifier.weight(1f))
-                    
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = VoidColor.Green.copy(alpha = 0.12f)
-                    ) {
-                        Text(
-                            text = if (isSuccess) "done" else "failed",
-                            style = TextStyle(
-                                fontFamily = FontFamily.Default,
-                                fontWeight = FontWeight(500),
-                                fontSize = 10.sp,
-                                color = outcomeColor
-                            ),
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                        )
+                    IconButton(onClick = onStartOverlay) {
+                        Icon(Icons.Default.Mic, contentDescription = "فرمان صوتی", tint = colors.text)
                     }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun AppInitialBadge(label: String) {
-    val colors = listOf(VoidColor.Violet, VoidColor.Cyan, VoidColor.Green, VoidColor.Amber)
-    val colorIndex = label.hashCode().mod(colors.size)
-    val bgColor = colors[colorIndex]
-    val initial = label.firstOrNull()?.uppercaseChar() ?: 'J'
-    
-    Box(
-        modifier = Modifier
-            .size(16.dp)
-            .clip(RoundedCornerShape(4.dp))
-            .background(bgColor),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = initial.toString(),
-            style = TextStyle(
-                fontFamily = FontFamily.Default,
-                fontWeight = FontWeight(700),
-                fontSize = 8.sp,
-                color = Color.White
-            )
-        )
-    }
-}
-
-@Composable
-private fun QuickAppsSection(apps: List<AppNode>, alpha: Float) {
-    Column(alpha = alpha) {
-        Text(
-            text = "QUICK APPS",
-            style = TextStyle(
-                fontFamily = FontFamily.Default,
-                fontWeight = FontWeight(600),
-                fontSize = 10.sp,
-                letterSpacing = 3.sp,
-                color = VoidColor.TextDisabled
-            )
-        )
-        
-        Spacer(modifier = Modifier.height(10.dp))
-        
-        LazyVerticalGrid(
-            columns = GridCells.Fixed(2),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-            modifier = Modifier.height(220.dp)
-        ) {
-            items(apps.ifEmpty { emptyList() }) { app ->
-                AppTile(app = app)
-            }
-        }
-    }
-}
-
-@Composable
-private fun AppTile(app: AppNode) {
-    Surface(
-        modifier = Modifier
-            .aspectRatio(1f)
-            .height(100.dp),
-        shape = RoundedCornerShape(20.dp),
-        color = VoidColor.Void900,
-        border = androidx.compose.foundation.BorderStroke(1.dp, VoidColor.BorderSubtle)
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.Center,
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            AppInitialBadge(label = app.label)
-            
-            Spacer(modifier = Modifier.height(8.dp))
-            
-            Text(
-                text = app.label,
-                style = TextStyle(
-                    fontFamily = FontFamily.Default,
-                    fontWeight = FontWeight(500),
-                    fontSize = 12.sp,
-                    color = VoidColor.TextSecondary
-                )
-            )
-        }
-    }
-}
-
-@Composable
-private fun BottomNavBar(
-    onSettingsClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        color = VoidColor.Void900
-    ) {
-        Column {
-            Divider(
-                modifier = Modifier.fillMaxWidth(),
-                thickness = 1.dp,
-                color = VoidColor.BorderSubtle
-            )
-            
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .navigationBarsPadding()
-                    .padding(vertical = 8.dp),
-                horizontalArrangement = Arrangement.SpaceEvenly
-            ) {
-                val items = listOf("Home", "Tasks", "Settings")
-                
-                items.forEachIndexed { index, item ->
-                    val isSelected = item == "Home" || item == "Tasks"
-                    val isSettings = item == "Settings"
-                    
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier.clickable {
-                            if (isSettings) onSettingsClick()
-                        }
-                    ) {
-                        if (isSelected) {
-                            Surface(
-                                shape = RoundedCornerShape(24.dp),
-                                color = VoidColor.Violet.copy(alpha = 0.08f)
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Icon(
-                                        imageVector = if (item == "Home") Icons.Filled.Task else Icons.Filled.Task,
-                                        contentDescription = item,
-                                        tint = VoidColor.Violet,
-                                        modifier = Modifier.size(22.dp)
-                                    )
-                                }
+                    BasicTextField(
+                        value = input,
+                        onValueChange = { input = it },
+                        modifier = Modifier.weight(1f).padding(vertical = 12.dp),
+                        textStyle = TextStyle(color = colors.text, fontSize = 15.sp, textAlign = TextAlign.Start),
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                        keyboardActions = KeyboardActions(onSend = { sendMessage() }),
+                        maxLines = 5,
+                        decorationBox = { inner ->
+                            Box {
+                                if (input.isEmpty()) Text("پیامت را بنویس…", color = colors.muted, fontSize = 14.sp)
+                                inner()
                             }
-                        } else {
-                            Icon(
-                                imageVector = Icons.Filled.Settings,
-                                contentDescription = item,
-                                tint = VoidColor.TextDisabled,
-                                modifier = Modifier.size(22.dp)
-                            )
                         }
+                    )
+                    IconButton(onClick = { sendMessage() }, enabled = input.isNotBlank() && !waitingForResponse) {
+                        Icon(
+                            Icons.Default.Send,
+                            contentDescription = "ارسال",
+                            tint = if (input.isNotBlank() && !waitingForResponse) colors.accent else colors.muted
+                        )
                     }
                 }
+            }
+            Spacer(Modifier.height(4.dp))
+        }
+    }
+
+    if (showHistory) {
+        AlertDialog(
+            onDismissRequest = { showHistory = false },
+            containerColor = colors.surface,
+            title = { Text("گفت‌وگوهای قبلی", color = colors.text) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (threads.isEmpty()) Text("هنوز گفت‌وگویی ذخیره نشده.", color = colors.muted)
+                    threads.forEach { thread ->
+                        Column(
+                            modifier = Modifier.fillMaxWidth().clickable {
+                                currentThreadId = thread.id
+                                ChatStorage.setCurrentThreadId(context, thread.id)
+                                messages = thread.messages
+                                showHistory = false
+                            }.padding(vertical = 7.dp)
+                        ) {
+                            Text(thread.title, color = colors.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(formatDate(thread.updatedAt), color = colors.muted, fontSize = 11.sp)
+                        }
+                        Divider(color = colors.border)
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { showHistory = false }) { Text("بستن") } }
+        )
+    }
+
+    if (showProfile) {
+        val user = FirebaseAuth.getInstance().currentUser
+        AlertDialog(
+            onDismissRequest = { showProfile = false },
+            containerColor = colors.surface,
+            title = { Text("پروفایل کاربری", color = colors.text) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(user?.email.orEmpty(), color = colors.muted, fontSize = 12.sp)
+                    androidx.compose.material3.OutlinedTextField(
+                        value = profileName,
+                        onValueChange = { profileName = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text("نام نمایشی") },
+                        singleLine = true
+                    )
+                    if (profileStatus != null) {
+                        Text(profileStatus.orEmpty(), color = colors.muted, fontSize = 12.sp)
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val current = FirebaseAuth.getInstance().currentUser
+                    if (current == null) {
+                        profileStatus = "حساب واردشده پیدا نشد."
+                    } else {
+                        val request = UserProfileChangeRequest.Builder()
+                            .setDisplayName(profileName.trim())
+                            .build()
+                        current.updateProfile(request).addOnCompleteListener { task ->
+                            profileStatus = if (task.isSuccessful) "نام پروفایل ذخیره شد." else "ذخیره ناموفق بود."
+                        }
+                    }
+                }) { Text("ذخیره") }
+            },
+            dismissButton = {
+                Row {
+                    TextButton(onClick = { showProfile = false }) { Text("بستن") }
+                    TextButton(onClick = {
+                        FirebaseAuth.getInstance().signOut()
+                        val intent = Intent(context, AuthActivity::class.java)
+                        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                        context.startActivity(intent)
+                        (context as? Activity)?.finish()
+                    }) { Text("خروج از حساب") }
+                }
+            }
+        )
+    }
+
+    if (showTone) {
+        AlertDialog(
+            onDismissRequest = { showTone = false },
+            containerColor = colors.surface,
+            title = { Text("لحن پاسخ جارویس", color = colors.text) },
+            text = {
+                Column {
+                    listOf(
+                        "natural" to "طبیعی و محاوره‌ای",
+                        "concise" to "کوتاه و مستقیم",
+                        "friendly" to "دوستانه",
+                        "formal" to "رسمی"
+                    ).forEach { (key, label) ->
+                        Text(
+                            label,
+                            modifier = Modifier.fillMaxWidth().clickable {
+                                tone = key
+                                prefs.edit().putString("response_tone", key).apply()
+                                showTone = false
+                            }.padding(vertical = 12.dp),
+                            color = if (tone == key) colors.text else colors.muted
+                        )
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { showTone = false }) { Text("تمام") } }
+        )
+    }
+}
+
+@Composable
+private fun MessageBubble(message: ChatMessage, colors: ChatColors) {
+    val isUser = message.role == "user"
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = if (isUser) Arrangement.Start else Arrangement.End
+    ) {
+        Surface(
+            color = if (isUser) colors.userBubble else colors.assistantBubble,
+            shape = RoundedCornerShape(18.dp),
+            border = androidx.compose.foundation.BorderStroke(1.dp, colors.border),
+            modifier = Modifier.fillMaxWidth(0.88f)
+        ) {
+            Column(Modifier.padding(horizontal = 14.dp, vertical = 11.dp)) {
+                Text(message.text, color = colors.text, fontSize = 14.sp, lineHeight = 22.sp)
+                Text(
+                    formatTime(message.timestamp),
+                    color = colors.muted,
+                    fontSize = 10.sp,
+                    modifier = Modifier.align(Alignment.End).padding(top = 5.dp)
+                )
             }
         }
     }
 }
 
-private fun formatRelativeTime(timestamp: Long): String {
-    val diff = System.currentTimeMillis() - timestamp
-    val minutes = diff / 60000
-    return when {
-        minutes < 1 -> "now"
-        minutes < 60 -> "${minutes}m"
-        else -> "${minutes / 60}h"
-    }
-}
+private fun formatTime(timestamp: Long): String =
+    SimpleDateFormat("HH:mm", Locale("fa", "IR")).format(Date(timestamp))
+
+private fun formatDate(timestamp: Long): String =
+    SimpleDateFormat("yyyy/MM/dd • HH:mm", Locale("fa", "IR")).format(Date(timestamp))

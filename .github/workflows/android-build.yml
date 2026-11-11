@@ -1,12 +1,19 @@
-﻿name: Android APK Build
+name: Android APK Build
 
 on:
   push:
-    branches: ["main"]
+    branches: ["main", "fix/kotlin-build-errors"]
   workflow_dispatch:
+  pull_request:
+    branches: ["main"]
+    types: [opened, synchronize, reopened, ready_for_review]
 
 permissions:
   contents: read
+
+concurrency:
+  group: android-debug-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
@@ -32,10 +39,72 @@ jobs:
         run: |
           sdkmanager "platforms;android-34" "build-tools;34.0.0"
 
+      # Use Google's official full-color G mark for the localized sign-in button.
+      - name: Download official Google sign-in mark
+        run: |
+          mkdir -p app/src/main/res/drawable
+          curl --fail --location --retry 3 --retry-delay 2 \
+            "https://developers.google.com/identity/images/g-logo.png" \
+            --output app/src/main/res/drawable/google_g_logo.png
+          python - <<'PY'
+          from pathlib import Path
+          data = Path("app/src/main/res/drawable/google_g_logo.png").read_bytes()
+          if not data.startswith(b"\x89PNG\r\n\x1a\n"):
+              raise SystemExit("Downloaded Google sign-in mark is not a valid PNG.")
+          width = int.from_bytes(data[16:20], "big")
+          height = int.from_bytes(data[20:24], "big")
+          if width < 48 or height < 48:
+              raise SystemExit(f"Google sign-in mark resolution is too small: {width}x{height}")
+          print(f"Official Google G asset verified: {width}x{height}")
+          PY
+
+      # Firebase configuration is restored from the Actions repository secret.
+      - name: Restore Firebase configuration
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          test -n "$GOOGLE_SERVICES_JSON"
+          printf '%s' "$GOOGLE_SERVICES_JSON" > app/google-services.json
+          python -m json.tool app/google-services.json > /dev/null
+
+      # Credential Manager requires the Web OAuth client ID as an Android string resource.
+      - name: Configure Google Sign-In client ID
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from xml.sax.saxutils import escape
+
+          config = json.loads(Path("app/google-services.json").read_text(encoding="utf-8"))
+          candidates = []
+          for client in config.get("client", []):
+              candidates.extend(client.get("oauth_client", []))
+              candidates.extend(client.get("services", {}).get("appinvite_service", {}).get("other_platform_oauth_client", []))
+          web_client = next((item.get("client_id") for item in candidates if item.get("client_type") == 3 and item.get("client_id")), None)
+          if not web_client:
+              raise SystemExit("Missing Web OAuth client (client_type=3) in GOOGLE_SERVICES_JSON. Download a fresh google-services.json after enabling Google Sign-In and creating the Web OAuth client in Firebase/Google Cloud.")
+          values = Path("app/src/main/res/values")
+          values.mkdir(parents=True, exist_ok=True)
+          output = values / "google_auth_client.xml"
+          output.write_text(
+              '<?xml version="1.0" encoding="utf-8"?>\n<resources>\n'
+              f'    <string name="default_web_client_id" translatable="false">{escape(web_client)}</string>\n'
+              '</resources>\n',
+              encoding="utf-8"
+          )
+          print("Google Sign-In Web client ID configured.")
+          PY
+
       - name: Build Debug APK
         run: |
           chmod +x ./gradlew
-          ./gradlew :app:assembleDebug --no-daemon --max-workers=2 -Dorg.gradle.jvmargs="-Xmx3g -XX:MaxMetaspaceSize=1g -Dfile.encoding=UTF-8"
+          ./gradlew :app:assembleDebug --no-daemon --max-workers=2 --stacktrace --info -Dorg.gradle.jvmargs="-Xmx3g -XX:MaxMetaspaceSize=1g -Dfile.encoding=UTF-8"
+
+      - name: Inspect debug signing certificate
+        run: |
+          APK=$(find app/build/outputs/apk/debug -name '*.apk' -print -quit)
+          test -n "$APK"
+          "$ANDROID_HOME/build-tools/34.0.0/apksigner" verify --print-certs "$APK"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4

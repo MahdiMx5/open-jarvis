@@ -33,6 +33,17 @@ class AndroidSTTEngine(private val context: Context) : STTEngine {
     private var currentCallback: ((String?) -> Unit)? = null
     private var currentErrorCallback: ((String) -> Unit)? = null
     private var pendingResult: String? = null
+    @Volatile private var speechDetectedListener: (() -> Unit)? = null
+
+    override fun setSpeechDetectedListener(listener: (() -> Unit)?) {
+        speechDetectedListener = listener
+    }
+    @Volatile private var recognitionLanguage: String = Locale.getDefault().toLanguageTag()
+
+    fun setRecognitionLanguage(languageTag: String) {
+        val supported = setOf("fa-IR", "en-US", "en-AU", "es-ES", "de-DE")
+        recognitionLanguage = languageTag.takeIf { it in supported } ?: "fa-IR"
+    }
 
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -40,15 +51,17 @@ class AndroidSTTEngine(private val context: Context) : STTEngine {
     private var silenceStartTime = -1L
     private var recordingStartTime = -1L
 
-    init {
-        mainHandler.post {
-            recognizer = SpeechRecognizer.createSpeechRecognizer(context)
-            recognizer?.setRecognitionListener(object : RecognitionListener {
+    @Volatile private var usingOnDeviceRecognizer = false
+    @Volatile private var onlineFallbackAttempted = false
+
+    private val recognitionListener = object : RecognitionListener {
                 override fun onReadyForSpeech(params: Bundle?) {
                     _isListening.value = true
                 }
 
-                override fun onBeginningOfSpeech() {}
+                override fun onBeginningOfSpeech() {
+                    speechDetectedListener?.invoke()
+                }
 
                 override fun onRmsChanged(rmsdB: Float) {
                     if (rmsdB * 100 < SILENCE_THRESHOLD) {
@@ -72,6 +85,17 @@ class AndroidSTTEngine(private val context: Context) : STTEngine {
 
                 override fun onError(error: Int) {
                     _isListening.value = false
+                    val canFallbackToOnline = usingOnDeviceRecognizer &&
+                        !onlineFallbackAttempted &&
+                        (error == SpeechRecognizer.ERROR_LANGUAGE_NOT_SUPPORTED ||
+                         error == SpeechRecognizer.ERROR_LANGUAGE_UNAVAILABLE)
+                    if (canFallbackToOnline) {
+                        onlineFallbackAttempted = true
+                        recognizer?.destroy()
+                        createRecognizer(preferOnDevice = false)
+                        recognizer?.startListening(createRecognitionIntent())
+                        return
+                    }
                     val errorMessage = when (error) {
                         SpeechRecognizer.ERROR_AUDIO -> "Audio recording error"
                         SpeechRecognizer.ERROR_CLIENT -> "Client error"
@@ -87,6 +111,8 @@ class AndroidSTTEngine(private val context: Context) : STTEngine {
                     if (pendingResult.isNullOrBlank()) {
                         currentErrorCallback?.invoke(errorMessage)
                     }
+                    currentCallback = null
+                    currentErrorCallback = null
                 }
 
                 override fun onResults(results: Bundle?) {
@@ -99,31 +125,70 @@ class AndroidSTTEngine(private val context: Context) : STTEngine {
                     } else {
                         currentErrorCallback?.invoke("No speech detected")
                     }
+                    currentCallback = null
+                    currentErrorCallback = null
                 }
 
                 override fun onPartialResults(partialResults: Bundle?) {}
 
                 override fun onEvent(eventType: Int, params: Bundle?) {}
-            })
-        }
     }
+
+    init {
+        mainHandler.post { createRecognizer(preferOnDevice = true) }
+    }
+
+    private fun createRecognizer(preferOnDevice: Boolean) {
+        val useLocal = preferOnDevice &&
+            android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S &&
+            SpeechRecognizer.isOnDeviceRecognitionAvailable(context)
+        usingOnDeviceRecognizer = useLocal
+        recognizer = if (useLocal) {
+            SpeechRecognizer.createOnDeviceSpeechRecognizer(context)
+        } else {
+            SpeechRecognizer.createSpeechRecognizer(context)
+        }.also { it.setRecognitionListener(recognitionListener) }
+    }
+
+    private fun createRecognitionIntent(): Intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+        putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+        putExtra(RecognizerIntent.EXTRA_LANGUAGE, recognitionLanguage)
+        putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, recognitionLanguage)
+        putExtra(RecognizerIntent.EXTRA_ONLY_RETURN_LANGUAGE_PREFERENCE, false)
+        putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
+        putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
+        putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, SILENCE_TIMEOUT_MS)
+    }
+
 
     override fun startListening(onResult: (String?) -> Unit, onError: (String) -> Unit) {
         currentCallback = onResult
         currentErrorCallback = onError
         pendingResult = null
+        onlineFallbackAttempted = false
         silenceStartTime = -1L
 
-        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault())
-            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
-            putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
-            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_CONFIDENCE_THRESHOLD, 0.1f)
-            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, SILENCE_TIMEOUT_MS)
+        if (!SpeechRecognizer.isRecognitionAvailable(context)) {
+            onError("Speech recognition is not available on this device")
+            return
         }
 
-        recognizer?.startListening(intent)
+        val currentRecognizer = recognizer
+        if (currentRecognizer == null) {
+            onError("Speech recognizer is not ready")
+            return
+        }
+
+        val intent = createRecognitionIntent()
+
+        try {
+            currentRecognizer.startListening(intent)
+        } catch (error: Exception) {
+            _isListening.value = false
+            currentErrorCallback = null
+            currentCallback = null
+            onError(error.message ?: "Unable to start speech recognition")
+        }
     }
 
     private fun stopListeningEarly() {
@@ -141,19 +206,21 @@ class AndroidSTTEngine(private val context: Context) : STTEngine {
         audioRecord?.release()
         audioRecord = null
         
-        val result = pendingResult
-        pendingResult = null
-        currentCallback = null
-        currentErrorCallback = null
-        return result
+        return pendingResult.also { pendingResult = null }
     }
 
     override fun isListening(): Boolean = _isListening.value
 
     override fun release() {
-        stop()
+        _isListening.value = false
+        currentCallback = null
+        currentErrorCallback = null
+        recognizer?.cancel()
         recognizer?.destroy()
         recognizer = null
+        runCatching { audioRecord?.stop() }
+        runCatching { audioRecord?.release() }
+        audioRecord = null
         scope.cancel()
     }
 

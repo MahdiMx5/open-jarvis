@@ -87,7 +87,9 @@ class ScreenWatcher(private val context: Context, private val agentCore: com.ope
                 
                 if (triggered) {
                     executeAction(rule.action, screenText)
-                    rule.lastTriggered = now
+                    val ruleIndex = rules.indexOfFirst { it.id == rule.id }
+                    if (ruleIndex >= 0) rules[ruleIndex] = rule.copy(lastTriggered = now)
+
                 }
             }
         } catch (e: Exception) {

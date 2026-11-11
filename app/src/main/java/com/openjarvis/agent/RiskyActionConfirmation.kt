@@ -14,14 +14,12 @@ class RiskyActionConfirmation(private val context: Context) {
         EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
     )
     
-    private val autoProceedSeconds = 8
     
     fun shouldConfirm(action: Action): Boolean {
         return when (action.action) {
             Action.TYPE -> {
                 val packageName = action.packageName
-                val isMessaging = packageName in messagingPackages
-                isMessaging
+                requiresInputConfirmation(packageName)
             }
             Action.OPEN_APP -> {
                 val isFinancial = action.packageName in financialPackages
@@ -34,8 +32,11 @@ class RiskyActionConfirmation(private val context: Context) {
     fun getRiskLevel(action: Action): RiskLevel {
         return when (action.action) {
             Action.TYPE -> {
-                val isMessaging = action.packageName in messagingPackages
-                if (isMessaging) RiskLevel.MEDIUM else RiskLevel.LOW
+                when {
+                    action.packageName in financialPackages -> RiskLevel.HIGH
+                    requiresInputConfirmation(action.packageName) -> RiskLevel.MEDIUM
+                    else -> RiskLevel.LOW
+                }
             }
             Action.OPEN_APP -> {
                 action.packageName?.let { pkg ->
@@ -74,8 +75,8 @@ class RiskyActionConfirmation(private val context: Context) {
     private fun buildDetails(action: Action): List<String> {
         return listOf(
             "This action will interact with ${action.packageName}",
-            "Auto-proceeds in ${autoProceedSeconds} seconds",
-            "You can cancel anytime before execution"
+            "Sensitive input requires explicit confirmation",
+            "You can cancel before the text is entered"
         )
     }
     
@@ -92,6 +93,13 @@ class RiskyActionConfirmation(private val context: Context) {
     enum class RiskLevel { LOW, MEDIUM, HIGH }
     
     companion object {
+        fun requiresInputConfirmation(packageName: String?): Boolean {
+            if (packageName.isNullOrBlank()) return false
+            return packageName in messagingPackages ||
+                packageName in financialPackages ||
+                packageName in socialPackages
+        }
+
         private val messagingPackages = listOf(
             "com.whatsapp",
             "com.google.android.apps.messaging",

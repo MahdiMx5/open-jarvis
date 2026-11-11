@@ -8,6 +8,10 @@ import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
+import java.io.FileInputStream
+import java.io.BufferedInputStream
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
 
 class AppBuilderMode(private val context: Context) {
     
@@ -51,32 +55,39 @@ class AppBuilderMode(private val context: Context) {
     }
     
     suspend fun generateProject(spec: AppSpec) = withContext(Dispatchers.IO) {
-        val projectDir = File(outputDir, spec.packageSafeName).also { it.mkdirs() }
-        
+        val safeSpec = spec.copy(
+            packageSafeName = sanitizeProjectName(spec.packageSafeName),
+            screens = spec.screens.map { it.copy(name = sanitizeScreenName(it.name)) }
+        )
+        val canonicalOutput = outputDir.canonicalFile
+        val projectDir = File(canonicalOutput, safeSpec.packageSafeName).canonicalFile
+        require(projectDir.path.startsWith(canonicalOutput.path + File.separator)) {
+            "Invalid generated project directory"
+        }
+        projectDir.mkdirs()
+
         _state.value = BuildState.Generating("build.gradle", 0)
-        
-        val filesToGenerate = buildFileList(spec)
-        
+
+        val filesToGenerate = buildFileList(safeSpec)
+
         filesToGenerate.forEachIndexed { index, fileSpec ->
             _state.value = BuildState.Generating(
                 fileSpec.path,
                 (index * 100 / filesToGenerate.size)
             )
-            
-            val content = generateFileContent(fileSpec, spec)
-            val file = File(projectDir, fileSpec.path)
+
+            val content = generateFileContent(fileSpec, safeSpec)
+            val file = File(projectDir, fileSpec.path).canonicalFile
+            require(file.path.startsWith(projectDir.path + File.separator)) {
+                "Generated file path escaped the project directory"
+            }
             file.parentFile?.mkdirs()
             file.writeText(content)
         }
-        
-        _state.value = BuildState.Building(0)
-        
-        if (isGradleAvailable()) {
-            buildApk(projectDir)
-        } else {
-            zipProject(projectDir)
-            _state.value = BuildState.Complete(spec.appName, null)
-        }
+
+        _state.value = BuildState.Building(50)
+        val archive = zipProject(projectDir)
+        _state.value = BuildState.Complete(safeSpec.appName, archive.absolutePath)
     }
     
     private fun buildFileList(spec: AppSpec): List<FileSpec> {
@@ -144,23 +155,63 @@ class AppBuilderMode(private val context: Context) {
         }
     }
     
-    private fun isGradleAvailable(): Boolean {
-        return try {
-            Runtime.getRuntime().exec("gradle --version")
-            true
-        } catch (e: Exception) {
-            false
+    private fun zipProject(projectDir: File): File {
+        val canonicalOutput = outputDir.canonicalFile
+        val canonicalProject = projectDir.canonicalFile
+        require(canonicalProject.path.startsWith(canonicalOutput.path + File.separator)) {
+            "Project directory is outside the output folder"
+        }
+
+        val archive = File(canonicalOutput, "${projectDir.name}.zip")
+        val temporaryArchive = File(canonicalOutput, "${projectDir.name}.zip.tmp")
+        if (temporaryArchive.exists()) temporaryArchive.delete()
+
+        try {
+            ZipOutputStream(temporaryArchive.outputStream().buffered()).use { zip ->
+                val files = projectDir.walkTopDown().filter { it.isFile }.toList()
+                files.forEachIndexed { index, file ->
+                    val canonicalFile = file.canonicalFile
+                    require(canonicalFile.path.startsWith(canonicalProject.path + File.separator)) {
+                        "Generated file escaped the project directory"
+                    }
+                    val relativePath = canonicalProject.toPath()
+                        .relativize(canonicalFile.toPath()).toString().replace(File.separatorChar, '/')
+                    zip.putNextEntry(ZipEntry("${projectDir.name}/$relativePath"))
+                    BufferedInputStream(FileInputStream(canonicalFile)).use { input ->
+                        input.copyTo(zip)
+                    }
+                    zip.closeEntry()
+                    _state.value = BuildState.Building(
+                        50 + ((index + 1) * 50 / files.size.coerceAtLeast(1))
+                    )
+                }
+            }
+            if (archive.exists() && !archive.delete()) {
+                throw IllegalStateException("Unable to replace previous project archive")
+            }
+            if (!temporaryArchive.renameTo(archive)) {
+                throw IllegalStateException("Unable to finalize project archive")
+            }
+            return archive
+        } catch (error: Exception) {
+            temporaryArchive.delete()
+            throw error
         }
     }
     
-    private suspend fun buildApk(projectDir: File) {
-        _state.value = BuildState.Building(0)
+    private fun sanitizeProjectName(value: String): String {
+        return value.lowercase()
+            .replace(Regex("[^a-z0-9_-]"), "_")
+            .trim('_', '-')
+            .take(48)
+            .ifBlank { "myapp" }
     }
-    
-    private fun zipProject(projectDir: File) {
-        _state.value = BuildState.Complete(projectDir.name, null)
+
+    private fun sanitizeScreenName(value: String): String {
+        val candidate = value.replace(Regex("[^A-Za-z0-9_]"), "").take(48)
+        return candidate.takeIf { it.firstOrNull()?.isLetter() == true } ?: "Screen"
     }
-    
+
     private fun parseAppSpec(json: JSONObject): AppSpec {
         return AppSpec(
             appName = json.optString("appName", "MyApp"),
@@ -215,7 +266,7 @@ class AppBuilderMode(private val context: Context) {
     )
     
     enum class FileType {
-        GRADLE, GRADLE_APP, MANIFEST, KOTLIN, XML, PROPERTIES, MARKDOWN
+        GRADLE, GRADLE_APP, MANIFEST, KOTLIN, XML, PROPERTIES, PROGUARD, MARKDOWN
     }
 }
 
@@ -228,7 +279,7 @@ data class AppSpec(
     val screens: List<ScreenSpec>,
     val entities: List<EntitySpec>,
     val permissions: List<String>,
-    val complexity: AppBuilderMode.Complexity
+    val complexity: Complexity
 )
 
 data class ScreenSpec(

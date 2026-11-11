@@ -5,32 +5,42 @@ import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
 import java.util.Locale
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 
 class AndroidTTSEngine(private val context: Context) {
 
     private var tts: TextToSpeech? = null
     private var isReady = false
-    private var speechRate = 1.05f
-    private var pitch = 0.95f
+    private var speechRate = 0.96f
+    private var pitch = 1.0f
+    @Volatile private var preferredLanguageTag = "fa-IR"
+    private val completionCallbacks = ConcurrentHashMap<String, () -> Unit>()
 
     init {
         tts = TextToSpeech(context) { status ->
             if (status == TextToSpeech.SUCCESS) {
                 isReady = true
-                tts?.language = Locale.US
+                tts?.setLanguage(Locale.US)
                 tts?.setSpeechRate(speechRate)
                 tts?.setPitch(pitch)
                 
                 tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
                     override fun onStart(utteranceId: String?) {}
-                    override fun onDone(utteranceId: String?) {}
-                    override fun onError(utteranceId: String?) {}
+                    override fun onDone(utteranceId: String?) {
+                        completionCallbacks.remove(utteranceId)?.invoke()
+                    }
+                    override fun onError(utteranceId: String?) {
+                        completionCallbacks.remove(utteranceId)?.invoke()
+                    }
+                    override fun onStop(utteranceId: String?, interrupted: Boolean) {
+                        completionCallbacks.remove(utteranceId)?.invoke()
+                    }
                 })
             }
         }
     }
 
-    fun speak(text: String) {
+    fun speak(text: String, onDone: (() -> Unit)? = null) {
         if (!isReady) return
         
         val clean = text
@@ -40,8 +50,11 @@ class AndroidTTSEngine(private val context: Context) {
         
         if (clean.isBlank()) return
         
+        selectLanguageFor(clean)
         val utteranceId = "jarvis_${UUID.randomUUID()}"
-        tts?.speak(clean, TextToSpeech.QUEUE_FLUSH, null, utteranceId)
+        if (onDone != null) completionCallbacks[utteranceId] = onDone
+        val result = tts?.speak(clean, TextToSpeech.QUEUE_FLUSH, null, utteranceId)
+        if (result == TextToSpeech.ERROR) completionCallbacks.remove(utteranceId)?.invoke()
     }
 
     fun speakQueued(text: String) {
@@ -54,8 +67,27 @@ class AndroidTTSEngine(private val context: Context) {
         
         if (clean.isBlank()) return
         
+        selectLanguageFor(clean)
         val utteranceId = "jarvis_${UUID.randomUUID()}"
         tts?.speak(clean, TextToSpeech.QUEUE_ADD, null, utteranceId)
+    }
+
+    fun setPreferredLanguage(languageTag: String) {
+        val supported = setOf("fa-IR", "en-US", "en-AU", "es-ES", "de-DE")
+        preferredLanguageTag = languageTag.takeIf { it in supported } ?: "fa-IR"
+    }
+
+    private fun selectLanguageFor(text: String) {
+        val hasPersian = text.any { it in '\u0600'..'\u06FF' }
+        val locale = if (hasPersian) Locale.forLanguageTag("fa-IR") else Locale.forLanguageTag(preferredLanguageTag)
+        val result = tts?.isLanguageAvailable(locale) ?: TextToSpeech.LANG_NOT_SUPPORTED
+        if (result >= TextToSpeech.LANG_AVAILABLE) {
+            tts?.language = locale
+        } else {
+            // Keep the engine's currently configured language; do not silently
+            // claim that a Persian voice is installed when the device lacks one.
+            tts?.language = Locale.getDefault()
+        }
     }
 
     fun stop() {
@@ -81,5 +113,6 @@ class AndroidTTSEngine(private val context: Context) {
         tts?.stop()
         tts?.shutdown()
         tts = null
+        completionCallbacks.clear()
     }
 }
