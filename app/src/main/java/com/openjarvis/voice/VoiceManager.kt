@@ -22,6 +22,8 @@ class VoiceManager(private val context: Context) {
         private const val KEY_SPEAK_RESULTS = "speak_results"
         private const val KEY_SPEECH_RATE = "speech_rate"
         private const val KEY_RECOGNITION_LANGUAGE = "recognition_language"
+        private const val KEY_TTS_LANGUAGE = "tts_language"
+        private const val KEY_TTS_VOICE = "tts_voice"
     }
 
     private val masterKey = MasterKey.Builder(context)
@@ -55,7 +57,8 @@ class VoiceManager(private val context: Context) {
         // Apply saved settings
         ttsEngine.setSpeechRate(getSpeechRate())
         sttEngine.setRecognitionLanguage(getRecognitionLanguage())
-        ttsEngine.setPreferredLanguage(getRecognitionLanguage())
+        ttsEngine.setPreferredLanguage(getTtsLanguage())
+        ttsEngine.setVoiceName(getTtsVoiceName())
     }
 
     fun initialize() { reloadSettings() }
@@ -68,7 +71,8 @@ class VoiceManager(private val context: Context) {
     fun reloadSettings() {
         ttsEngine.setSpeechRate(getSpeechRate())
         sttEngine.setRecognitionLanguage(getRecognitionLanguage())
-        ttsEngine.setPreferredLanguage(getRecognitionLanguage())
+        ttsEngine.setPreferredLanguage(getTtsLanguage())
+        ttsEngine.setVoiceName(getTtsVoiceName())
     }
 
     fun isVoiceEnabled(): Boolean = prefs.getBoolean(KEY_VOICE_ENABLED, false)
@@ -105,8 +109,28 @@ class VoiceManager(private val context: Context) {
         val safeLanguage = languageTag.takeIf { it in supported } ?: "fa-IR"
         prefs.edit().putString(KEY_RECOGNITION_LANGUAGE, safeLanguage).apply()
         sttEngine.setRecognitionLanguage(safeLanguage)
+    }
+
+    fun getTtsLanguage(): String =
+        prefs.getString(KEY_TTS_LANGUAGE, getRecognitionLanguage()) ?: getRecognitionLanguage()
+
+    fun setTtsLanguage(languageTag: String) {
+        val supported = setOf("fa-IR", "en-US", "en-AU", "es-ES", "de-DE")
+        val safeLanguage = languageTag.takeIf { it in supported } ?: "fa-IR"
+        prefs.edit().putString(KEY_TTS_LANGUAGE, safeLanguage).apply()
         ttsEngine.setPreferredLanguage(safeLanguage)
     }
+
+    fun getTtsVoiceName(): String? = prefs.getString(KEY_TTS_VOICE, null)
+
+    fun setTtsVoiceName(name: String?) {
+        prefs.edit().apply {
+            if (name.isNullOrBlank()) remove(KEY_TTS_VOICE) else putString(KEY_TTS_VOICE, name)
+        }.apply()
+        ttsEngine.setVoiceName(name)
+    }
+
+    fun getAvailableTtsVoices(): List<String> = ttsEngine.getAvailableVoices()
 
     fun setSpeechRate(rate: Float) {
         prefs.edit().putFloat(KEY_SPEECH_RATE, rate.coerceIn(0.5f, 2.0f)).apply()
