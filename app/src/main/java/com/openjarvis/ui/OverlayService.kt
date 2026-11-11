@@ -20,11 +20,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.lifecycle.LifecycleService
-import androidx.lifecycle.SavedStateRegistryOwner
+import androidx.savedstate.SavedStateRegistryOwner
 import androidx.savedstate.SavedStateRegistry
 import androidx.savedstate.SavedStateRegistryController
 import androidx.lifecycle.setViewTreeLifecycleOwner
-import androidx.lifecycle.setViewTreeSavedStateRegistryOwner
+import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
