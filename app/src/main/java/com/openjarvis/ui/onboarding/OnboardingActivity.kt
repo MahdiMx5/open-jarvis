@@ -128,7 +128,7 @@ private fun WelcomeScreen(onGetStarted: () -> Unit) {
             text = "OPEN\nJARVIS",
             fontSize = 48.sp,
             fontWeight = FontWeight.Bold,
-            color = VoidColor.Violet,
+            color = VoidColor.Cyan,
             textAlign = TextAlign.Center,
             lineHeight = 52.sp
         )
@@ -156,7 +156,7 @@ private fun WelcomeScreen(onGetStarted: () -> Unit) {
         Button(
             onClick = onGetStarted,
             colors = ButtonDefaults.buttonColors(
-                containerColor = VoidColor.Violet
+                containerColor = VoidColor.Cyan
             ),
             shape = RoundedCornerShape(12.dp)
         ) {
@@ -198,7 +198,7 @@ private fun PermissionsScreen(onBack: () -> Unit, onContinue: () -> Unit) {
         
         Button(
             onClick = onContinue,
-            colors = ButtonDefaults.buttonColors(containerColor = VoidColor.Violet),
+            colors = ButtonDefaults.buttonColors(containerColor = VoidColor.Cyan),
             modifier = Modifier.fillMaxWidth()
         ) {
             Text("Continue")
@@ -221,7 +221,7 @@ private fun PermissionRow(title: String, subtitle: String) {
             Icon(
                 Icons.Default.CheckCircle,
                 contentDescription = null,
-                tint = VoidColor.Violet,
+                tint = VoidColor.Cyan,
                 modifier = Modifier.size(24.dp)
             )
             Spacer(modifier = Modifier.width(16.dp))
@@ -277,7 +277,7 @@ private fun ProviderScreen(onBack: () -> Unit, onContinue: () -> Unit, onSkip: (
         
         Button(
             onClick = onContinue,
-            colors = ButtonDefaults.buttonColors(containerColor = VoidColor.Violet),
+            colors = ButtonDefaults.buttonColors(containerColor = VoidColor.Cyan),
             modifier = Modifier.fillMaxWidth()
         ) {
             Text("Continue")
@@ -333,7 +333,7 @@ private fun TryItScreen(onBack: () -> Unit, onSuccess: () -> Unit) {
             onValueChange = { command = it },
             modifier = Modifier.fillMaxWidth(),
             colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = VoidColor.Violet,
+                focusedBorderColor = VoidColor.Cyan,
                 unfocusedBorderColor = VoidColor.BorderSubtle
             ),
             placeholder = { Text("Type your command...") }
@@ -349,7 +349,7 @@ private fun TryItScreen(onBack: () -> Unit, onSuccess: () -> Unit) {
             contentAlignment = Alignment.Center
         ) {
             if (isRunning) {
-                CircularProgressIndicator(color = VoidColor.Violet)
+                CircularProgressIndicator(color = VoidColor.Cyan)
             } else {
                 Text(
                     "Press Run to execute",
@@ -369,7 +369,7 @@ private fun TryItScreen(onBack: () -> Unit, onSuccess: () -> Unit) {
                     onSuccess()
                 }
             },
-            colors = ButtonDefaults.buttonColors(containerColor = VoidColor.Violet),
+            colors = ButtonDefaults.buttonColors(containerColor = VoidColor.Cyan),
             modifier = Modifier.fillMaxWidth(),
             enabled = !isRunning
         ) {
@@ -388,7 +388,7 @@ private fun ReadyScreen(onStart: () -> Unit) {
         Icon(
             Icons.Default.CheckCircle,
             contentDescription = null,
-            tint = VoidColor.Violet,
+            tint = VoidColor.Cyan,
             modifier = Modifier.size(64.dp)
         )
         
@@ -413,7 +413,7 @@ private fun ReadyScreen(onStart: () -> Unit) {
         
         Button(
             onClick = onStart,
-            colors = ButtonDefaults.buttonColors(containerColor = VoidColor.Violet),
+            colors = ButtonDefaults.buttonColors(containerColor = VoidColor.Cyan),
             shape = RoundedCornerShape(12.dp)
         ) {
             Text(
