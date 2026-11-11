@@ -240,15 +240,27 @@ class OpenAIProvider(
     override suspend fun testConnection(): Result<Long> = withContext(Dispatchers.IO) {
         runCatching {
             val startTime = System.currentTimeMillis()
+            // Test the same generation endpoint used by chat. A successful /models
+            // response alone does not prove that this key can use the selected model.
+            val requestBody = JSONObject().apply {
+                put("model", model)
+                put("messages", JSONArray().put(
+                    JSONObject().put("role", "user").put("content", "Reply with OK.")
+                ))
+                put("max_tokens", 1)
+            }.toString()
             val request = Request.Builder()
-                .url("$baseUrl/models")
+                .url("$baseUrl/chat/completions")
                 .addHeader("Authorization", "Bearer $apiKey")
-                .get()
+                .addHeader("Content-Type", "application/json")
+                .post(requestBody.toRequestBody("application/json".toMediaType()))
                 .build()
-            
+
             HttpClient.client.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) {
-                    throw Exception("HTTP ${response.code}")
+                val body = readProviderResponse(response, name)
+                val json = JSONObject(body)
+                if (!json.has("choices") || json.getJSONArray("choices").length() == 0) {
+                    throw IllegalStateException("OpenAI test returned no completion choices")
                 }
             }
             System.currentTimeMillis() - startTime
