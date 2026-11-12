@@ -14,6 +14,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -59,6 +60,7 @@ data class ProviderFormSettings(
 @Composable
 fun SettingsScreen(
     onNavigateBack: () -> Unit,
+    onOpenProfile: () -> Unit,
     onSaveProvider: (String, String, String, String) -> Unit,
     onLoadProvider: (String) -> ProviderFormSettings,
     onTestConnection: suspend () -> Result<Long>,
@@ -118,6 +120,28 @@ fun SettingsScreen(
                     .verticalScroll(scrollState)
                     .padding(horizontal = 24.dp, vertical = 16.dp)
             ) {
+                SectionLabel("حساب کاربری")
+                Spacer(modifier = Modifier.height(12.dp))
+                Surface(
+                    modifier = Modifier.fillMaxWidth().clickable(onClick = onOpenProfile),
+                    shape = RoundedCornerShape(16.dp),
+                    color = VoidColor.Void900,
+                    border = BorderStroke(1.dp, VoidColor.BorderSubtle)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Default.AccountCircle, contentDescription = null, tint = VoidColor.Cyan, modifier = Modifier.size(28.dp))
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("پروفایل من", color = VoidColor.TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                            Text("اطلاعات حساب، نام نمایشی و امنیت", color = VoidColor.TextDisabled, fontSize = 11.sp)
+                        }
+                        Icon(Icons.Default.KeyboardArrowLeft, contentDescription = null, tint = VoidColor.TextSecondary)
+                    }
+                }
+                Spacer(modifier = Modifier.height(24.dp))
                 SectionLabel("ارائه‌دهنده هوش مصنوعی")
                 
                 Spacer(modifier = Modifier.height(12.dp))

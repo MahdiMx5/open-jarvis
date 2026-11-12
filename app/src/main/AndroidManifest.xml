@@ -54,6 +54,12 @@
             android:parentActivityName=".ui.MainActivity"
             android:theme="@style/Theme.OpenJarvis" />
 
+        <activity
+            android:name=".ui.ProfileActivity"
+            android:exported="false"
+            android:parentActivityName=".ui.SettingsActivity"
+            android:theme="@style/Theme.OpenJarvis" />
+
         <service
             android:name=".accessibility.JarvisAccessibilityService"
             android:exported="true"

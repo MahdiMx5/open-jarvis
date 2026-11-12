@@ -1,5 +1,6 @@
 package com.openjarvis.ui
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -46,6 +47,7 @@ class SettingsActivity : ComponentActivity() {
             OpenJarvisTheme {
                 SettingsScreen(
                     onNavigateBack = { finish() },
+                    onOpenProfile = { startActivity(Intent(this@SettingsActivity, ProfileActivity::class.java)) },
                     onSaveProvider = { name, baseUrl, apiKey, model ->
                         saveProviderSettings(name, baseUrl, apiKey, model)
                     },

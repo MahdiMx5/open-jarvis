@@ -290,13 +290,6 @@ fun DashboardScreen(
                     }) {
                         Icon(if (darkMode) Icons.Default.LightMode else Icons.Default.DarkMode, contentDescription = "تغییر پوسته", tint = colors.text)
                     }
-                    IconButton(onClick = {
-                        profileName = FirebaseAuth.getInstance().currentUser?.displayName.orEmpty()
-                        profileStatus = null
-                        showProfile = true
-                    }) {
-                        Icon(Icons.Default.AccountCircle, contentDescription = "پروفایل", tint = colors.text)
-                    }
                     IconButton(onClick = onOpenPermissions) {
                         Icon(Icons.Default.Security, contentDescription = "مجوزها", tint = colors.text)
                     }
