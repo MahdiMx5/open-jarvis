@@ -102,8 +102,11 @@ class ProviderFallbackChain(private val context: Context) {
             401, 403 -> 24L * 60 * 60 * 1000 // Credentials/permissions require user action.
             404 -> 6L * 60 * 60 * 1000 // Endpoint/model may have been retired.
             429 -> 15L * 60 * 1000 // Quota/rate-limit cooldown; no repeated quota-consuming probes.
-            in 500..599 -> (2L * 60 * 1000 * (1L shl (count - 1).coerceAtMost(7))).coerceAtMost(4L * 60 * 60 * 1000)
-            else -> (60L * 1000 * (1L shl (count - 1).coerceAtMost(7))).coerceAtMost(2L * 60 * 60 * 1000)
+            else -> if (code != null && code in 500..599) {
+                (2L * 60 * 1000 * (1L shl (count - 1).coerceAtMost(7))).coerceAtMost(4L * 60 * 60 * 1000)
+            } else {
+                (60L * 1000 * (1L shl (count - 1).coerceAtMost(7))).coerceAtMost(2L * 60 * 60 * 1000)
+            }
         }
         health.edit()
             .putInt(countKey, count)

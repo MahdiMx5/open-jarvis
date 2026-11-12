@@ -139,7 +139,7 @@ fun SettingsScreen(
                 Spacer(modifier = Modifier.height(10.dp))
 
                 Text(
-                    text = "درخواست‌ها فقط به ارائه‌دهنده‌ای ارسال می‌شوند که خودت انتخاب کرده‌ای.",
+                    text = "MX5 ابتدا سرویس انتخابی را امتحان می‌کند؛ اگر پاسخ ندهد، سرورهای جایگزینِ تنظیم‌شده را به‌ترتیب امتحان می‌کند.",
                     style = TextStyle(
                         fontFamily = FontFamily.Default,
                         fontWeight = FontWeight(400),
