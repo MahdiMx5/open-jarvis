@@ -139,7 +139,7 @@ fun SettingsScreen(
                 Spacer(modifier = Modifier.height(10.dp))
 
                 Text(
-                    text = "MX5 ابتدا سرویس انتخابی را امتحان می‌کند؛ اگر پاسخ ندهد، سرورهای جایگزینِ تنظیم‌شده را به‌ترتیب امتحان می‌کند.",
+                    text = "MX5 فقط از سرویس‌های دارای مسیر رایگانِ تنظیم‌شده برای جابه‌جایی خودکار استفاده می‌کند؛ سرویس‌های پولی بدون انتخاب و تأیید جداگانه وارد زنجیره نمی‌شوند.",
                     style = TextStyle(
                         fontFamily = FontFamily.Default,
                         fontWeight = FontWeight(400),

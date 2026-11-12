@@ -20,9 +20,11 @@ class ProviderFallbackChain(private val context: Context) {
     suspend fun completeWithFallback(system: String, user: String): Result<String> {
         val adapter = UniversalAdapter(context)
         val activeName = adapter.getProviderName()
-        val candidates = (listOf(activeName) + UniversalAdapter.FREE_FALLBACK_PROVIDERS)
-            .distinct()
-            .filter { adapter.isProviderConfigured(it) }
+        val freeProviders = UniversalAdapter.FREE_FALLBACK_PROVIDERS
+        val candidates = (
+            (if (activeName in freeProviders) listOf(activeName) else emptyList()) +
+                freeProviders.filter { it != activeName }
+            ).filter { adapter.isProviderConfigured(it) }
 
         if (candidates.isEmpty()) {
             val message = "هیچ سرویس آنلاینی تنظیم نشده است. از تنظیمات، یک ارائه‌دهنده سازگار را انتخاب و کلید رسمی آن را وارد کن. ساخت حساب و احراز هویت باید طبق شرایط خود سرویس انجام شود."
