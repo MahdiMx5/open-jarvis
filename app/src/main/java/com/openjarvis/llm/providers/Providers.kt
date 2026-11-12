@@ -90,15 +90,28 @@ class OpenRouterProvider(
     override suspend fun testConnection(): Result<Long> = withContext(Dispatchers.IO) {
         runCatching {
             val startTime = System.currentTimeMillis()
+            // Validate the exact chat-completions route and selected model, not just API-key access.
+            val requestBody = JSONObject().apply {
+                put("model", model)
+                put("messages", JSONArray().put(
+                    JSONObject().put("role", "user").put("content", "Reply with OK.")
+                ))
+                put("max_tokens", 8)
+            }.toString()
             val request = Request.Builder()
-                .url("$baseUrl/models")
+                .url("$baseUrl/chat/completions")
                 .addHeader("Authorization", "Bearer $apiKey")
-                .get()
+                .addHeader("Content-Type", "application/json")
+                .addHeader("HTTP-Referer", "https://github.com/MahdiMx5/open-jarvis")
+                .addHeader("X-Title", "Open MX5")
+                .post(requestBody.toRequestBody("application/json".toMediaType()))
                 .build()
-            
+
             HttpClient.client.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) {
-                    throw Exception("HTTP ${response.code}")
+                val body = readProviderResponse(response, name)
+                val json = JSONObject(body)
+                if (!json.has("choices") || json.getJSONArray("choices").length() == 0) {
+                    throw IllegalStateException("OpenRouter test returned no completion choices")
                 }
             }
             System.currentTimeMillis() - startTime
