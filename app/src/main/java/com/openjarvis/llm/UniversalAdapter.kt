@@ -80,7 +80,8 @@ class UniversalAdapter(private val context: Context) {
             // A GGUF file alone is not a running inference engine. Keep this disabled
             // until the native llama.cpp runtime is integrated and verified.
             "Local (LlamaCpp)" -> false
-            "Ollama (Local)", "Custom", "Cloudflare Workers AI" -> !url.isNullOrBlank() && !key.isNullOrBlank()
+            "Ollama (Local)", "Custom" -> !url.isNullOrBlank()
+            "Cloudflare Workers AI" -> !url.isNullOrBlank() && !key.isNullOrBlank()
             else -> !key.isNullOrBlank()
         }
     }

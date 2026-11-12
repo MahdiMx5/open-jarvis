@@ -158,6 +158,18 @@ fun SettingsScreen(
                     visible = showBaseUrlField
                 )
                 
+                if (selectedProvider == "Cloudflare Workers AI") {
+                    Text(
+                        text = "نشانی پایه باید به شکل https://api.cloudflare.com/client/v4/accounts/شناسه-حساب/ai/v1 باشد.",
+                        style = TextStyle(
+                            fontFamily = FontFamily.Default,
+                            fontWeight = FontWeight(400),
+                            fontSize = 11.sp,
+                            color = VoidColor.TextDisabled
+                        )
+                    )
+                }
+
                 FloatingLabelTextField(
                     value = apiKey,
                     onValueChange = { apiKey = it },
