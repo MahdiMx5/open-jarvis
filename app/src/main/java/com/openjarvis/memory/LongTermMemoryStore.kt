@@ -73,7 +73,7 @@ class LongTermMemoryStore(context: Context) {
         writeMemories(emptyList())
     }
 
-    fun buildContext(query: String, limit: Int = 5): String = synchronized(lock) {
+    fun buildContext(query: String, limit: Int = 10): String = synchronized(lock) {
         val memories = readMemories()
         if (memories.isEmpty()) return@synchronized ""
 

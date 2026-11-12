@@ -93,6 +93,35 @@ class RiskyActionConfirmation(private val context: Context) {
     enum class RiskLevel { LOW, MEDIUM, HIGH }
     
     companion object {
+        /**
+         * Hard safety boundary: device automation must not operate financial-app screens.
+         * Launching an app and navigation-out actions remain allowed; screen interaction,
+         * screen extraction, and forwarding content to another AI are blocked.
+         */
+        fun isFinancialInteractionBlocked(action: Action, packageName: String?): Boolean {
+            val pkg = packageName?.trim()?.lowercase().orEmpty()
+            val isFinancialApp = pkg in financialPackages ||
+                listOf("bank", "banking", "wallet", "payment", "paytm", "phonepe", "razorpay", "shetab")
+                    .any { token -> pkg.contains(token) }
+
+            if (!isFinancialApp) return false
+
+            return action.action in setOf(
+                Action.TAP,
+                Action.TAP_COORDS,
+                Action.TYPE,
+                Action.CLEAR_TYPE,
+                Action.LONG_PRESS,
+                Action.SWIPE,
+                Action.SCROLL,
+                Action.WAIT_FOR,
+                Action.SCREENSHOT,
+                Action.READ_SCREEN,
+                Action.AI_PROMPT,
+                Action.EXTRACT_TEXT
+            )
+        }
+
         fun requiresInputConfirmation(packageName: String?): Boolean {
             if (packageName.isNullOrBlank()) return false
             return packageName in messagingPackages ||
