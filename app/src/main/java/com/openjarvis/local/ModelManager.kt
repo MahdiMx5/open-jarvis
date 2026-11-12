@@ -105,7 +105,7 @@ class ModelManager(private val context: Context) {
                 .build()
             
             val client = okhttp3.OkHttpClient()
-            client.newCall(request).execute().use { response ->
+            val downloadedSize = client.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) {
                     throw Exception("Download failed: HTTP ${response.code}")
                 }
@@ -119,8 +119,7 @@ class ModelManager(private val context: Context) {
                 val body = response.body ?: throw Exception("Empty response")
 
                 body.byteStream().use { input ->
-                    file.outputStream().use { output ->
-                        if (append) output.channel.position(existingSize)
+                    java.io.FileOutputStream(file, append).use { output ->
                         var downloaded = offset
                         var lastProgress = 0f
                         val buffer = ByteArray(8192)
@@ -152,7 +151,7 @@ class ModelManager(private val context: Context) {
 
             _state.value = ModelState.Downloaded(tier)
             
-            totalSize
+            downloadedSize
         }
     }
     
