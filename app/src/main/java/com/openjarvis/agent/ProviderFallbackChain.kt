@@ -7,8 +7,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
 /**
- * Sends chat requests only to the provider explicitly selected by the user.
- * No automatic routing or silent fallback to another provider is performed.
+ * Hybrid routing: try the selected provider first, then other providers for which
+ * the user has already saved credentials. Never invent credentials or silently
+ * use an unconfigured account.
  */
 class ProviderFallbackChain(private val context: Context) {
 
@@ -18,52 +19,59 @@ class ProviderFallbackChain(private val context: Context) {
     suspend fun completeWithFallback(system: String, user: String): Result<String> {
         val adapter = UniversalAdapter(context)
         val activeName = adapter.getProviderName()
+        val candidates = listOf(activeName) +
+            UniversalAdapter.AVAILABLE_PROVIDERS.filter { it != activeName }
 
-        if (!adapter.isProviderConfigured(activeName)) {
+        val configured = candidates.filter { adapter.isProviderConfigured(it) }
+        if (configured.isEmpty()) {
             return Result.failure(
-                IllegalStateException("برای $activeName کلید API یا تنظیمات لازم ثبت نشده است.")
+                IllegalStateException("هیچ ارائه‌دهندهٔ آنلاینِ پیکربندی‌شده‌ای وجود ندارد. برای پاسخ آفلاین، فعلاً فقط فرمان‌های پایه در دسترس‌اند.")
             )
         }
 
-        val provider = adapter.getProviderForName(activeName)
-            ?: return Result.failure(
-                IllegalStateException("ارائه‌دهنده $activeName قابل راه‌اندازی نیست؛ تنظیمات آن را بررسی کن.")
-            )
+        val failures = mutableListOf<String>()
+        for (name in configured) {
+            val provider = adapter.getProviderForName(name)
+            if (provider == null) {
+                failures += "$name: provider unavailable"
+                continue
+            }
 
-        val result = runCatching { provider.complete(system, user) }.getOrElse {
-            Result.failure(it)
+            val result = runCatching { provider.complete(system, user) }
+                .getOrElse { Result.failure(it) }
+
+            result.fold(
+                onSuccess = { answer ->
+                    if (answer.isNotBlank()) {
+                        _notification.value = if (name == activeName) null
+                            else "سرویس اصلی در دسترس نبود؛ پاسخ از $name دریافت شد."
+                        runCatching {
+                            graphifyRepo.logTask("provider:$name", "chat completed", name, 0L)
+                        }
+                        return Result.success(answer)
+                    }
+                    failures += "$name: empty response"
+                },
+                onFailure = { error ->
+                    failures += "$name: ${error.message.orEmpty().take(120)}"
+                    runCatching {
+                        graphifyRepo.logTask(
+                            "provider:$name",
+                            "failed: ${error.message.orEmpty()}",
+                            name,
+                            0L
+                        )
+                    }
+                }
+            )
         }
 
-        result.fold(
-            onSuccess = {
-                _notification.value = null
-                runCatching {
-                    graphifyRepo.logTask("provider:$activeName", "chat completed", activeName, 0L)
-                }
-            },
-            onFailure = { error ->
-                runCatching {
-                    graphifyRepo.logTask(
-                        "provider:$activeName",
-                        "failed: ${error.message.orEmpty()}",
-                        activeName,
-                        0L
-                    )
-                }
-                _notification.value = "ارتباط با $activeName ناموفق بود: ${error.message.orEmpty().take(180)}"
-            }
-        )
-
-        return result.fold(
-            onSuccess = { Result.success(it) },
-            onFailure = { error ->
-                Result.failure(
-                    IllegalStateException(
-                        "خطای $activeName: ${error.message ?: "پاسخی از سرویس دریافت نشد."}",
-                        error
-                    )
-                )
-            }
+        val message = failures.joinToString(" | ").take(700)
+        _notification.value = "همهٔ سرویس‌های تنظیم‌شده ناموفق بودند: $message"
+        return Result.failure(
+            IllegalStateException(
+                "هیچ سرویس آنلاینِ تنظیم‌شده‌ای پاسخ نداد. کلید و سهمیهٔ سرویس‌ها را بررسی کن. $message"
+            )
         )
     }
 
@@ -79,7 +87,7 @@ object JarvisErrorTranslator {
             message.contains("401") || message.contains("403") ->
                 "کلید دسترسی ${providerName ?: "سرویس"} معتبر نیست؛ کلید و دسترسی حساب را بررسی کن."
             message.contains("429") ->
-                "محدودیت درخواست یا اعتبار سرویس اعمال شده است؛ وضعیت حساب و پرداخت را بررسی کن."
+                "محدودیت درخواست یا اعتبار سرویس اعمال شده است؛ وضعیت سهمیه را بررسی کن."
             message.contains("404") ->
                 "مدل یا نشانی API پیدا نشد؛ نام مدل و ارائه‌دهنده را بررسی کن."
             message.contains("400") ->
