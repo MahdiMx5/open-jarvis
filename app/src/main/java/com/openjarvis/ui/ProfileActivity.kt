@@ -84,7 +84,7 @@ private fun ProfileScreen(onBack: () -> Unit) {
                 singleLine = true
             )
             Text("وضعیت ایمیل: " + if (user?.isEmailVerified == true) "تأیید شده" else "تأیید نشده", color = VoidColor.TextSecondary)
-            Text("روش ورود: " + (user?.providerData?.filter { it.providerId != "firebase" }?.joinToString { it.providerId }?.ifBlank { null } ?: "ایمیل / رمز عبور"), color = VoidColor.TextSecondary)
+            Text("روش ورود: " + (user?.providerData?.filter { it.providerId != "firebase" }?.joinToString { it.providerId }?.takeIf { it.isNotBlank() } ?: "ایمیل / رمز عبور"), color = VoidColor.TextSecondary)
             Text("شناسه حساب: " + (user?.uid?.take(12)?.plus("…") ?: "—"), color = VoidColor.TextSecondary)
             Button(
                 onClick = {
