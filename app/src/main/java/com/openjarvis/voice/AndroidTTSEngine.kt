@@ -3,14 +3,14 @@ package com.openjarvis.voice
 import android.content.Context
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
+import android.speech.tts.Voice
 import java.util.Locale
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 
 class AndroidTTSEngine(private val context: Context) {
-
-    private var tts: TextToSpeech? = null
-    private var isReady = false
+    @Volatile private var tts: TextToSpeech? = null
+    @Volatile private var isReady = false
     private var speechRate = 0.96f
     private var pitch = 1.0f
     @Volatile private var preferredLanguageTag = "fa-IR"
@@ -20,12 +20,10 @@ class AndroidTTSEngine(private val context: Context) {
     init {
         tts = TextToSpeech(context) { status ->
             if (status == TextToSpeech.SUCCESS) {
-                isReady = true
-                tts?.setLanguage(Locale.US)
                 tts?.setSpeechRate(speechRate)
                 tts?.setPitch(pitch)
-                applyPreferredVoice()
-                
+                isReady = true
+                configureLanguage(Locale.forLanguageTag(preferredLanguageTag))
                 tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
                     override fun onStart(utteranceId: String?) {}
                     override fun onDone(utteranceId: String?) {
@@ -44,14 +42,12 @@ class AndroidTTSEngine(private val context: Context) {
 
     fun speak(text: String, onDone: (() -> Unit)? = null) {
         if (!isReady) return
-        
         val clean = text
             .replace(Regex("\\[\\{.*?\\}\\]"), "")
-            .replace(Regex("[\\[\\]{}\":]"), " ")
+            .replace(Regex("""[\[\]{}":]"""), " ")
             .trim()
-        
         if (clean.isBlank()) return
-        
+
         selectLanguageFor(clean)
         val utteranceId = "jarvis_${UUID.randomUUID()}"
         if (onDone != null) completionCallbacks[utteranceId] = onDone
@@ -61,14 +57,12 @@ class AndroidTTSEngine(private val context: Context) {
 
     fun speakQueued(text: String) {
         if (!isReady) return
-        
         val clean = text
             .replace(Regex("\\[\\{.*?\\}\\]"), "")
-            .replace(Regex("[\\[\\]{}\":]"), " ")
+            .replace(Regex("""[\[\]{}":]"""), " ")
             .trim()
-        
         if (clean.isBlank()) return
-        
+
         selectLanguageFor(clean)
         val utteranceId = "jarvis_${UUID.randomUUID()}"
         tts?.speak(clean, TextToSpeech.QUEUE_ADD, null, utteranceId)
@@ -77,39 +71,64 @@ class AndroidTTSEngine(private val context: Context) {
     fun setPreferredLanguage(languageTag: String) {
         val supported = setOf("fa-IR", "en-US", "en-AU", "es-ES", "de-DE")
         preferredLanguageTag = languageTag.takeIf { it in supported } ?: "fa-IR"
+        if (isReady) configureLanguage(Locale.forLanguageTag(preferredLanguageTag))
     }
 
     private fun selectLanguageFor(text: String) {
-        val hasPersian = text.any { it in '\u0600'..'\u06FF' }
-        val locale = if (hasPersian) Locale.forLanguageTag("fa-IR") else Locale.forLanguageTag(preferredLanguageTag)
-        val result = tts?.isLanguageAvailable(locale) ?: TextToSpeech.LANG_NOT_SUPPORTED
-        if (result >= TextToSpeech.LANG_AVAILABLE) {
-            tts?.language = locale
+        val targetLocale = if (text.any { it.code in 0x0600..0x06FF }) {
+            Locale.forLanguageTag("fa-IR")
         } else {
-            // Keep the engine's currently configured language; do not silently
-            // claim that a Persian voice is installed when the device lacks one.
-            tts?.language = Locale.getDefault()
+            Locale.forLanguageTag(preferredLanguageTag)
         }
-        applyPreferredVoice()
+        configureLanguage(targetLocale)
     }
 
-    fun getAvailableVoices(): List<String> =
-        tts?.voices?.map { it.name }?.distinct()?.sorted().orEmpty()
+    private fun configureLanguage(targetLocale: Locale) {
+        val engine = tts ?: return
+        val result = engine.setLanguage(targetLocale)
+        val activeLocale = if (result >= TextToSpeech.LANG_AVAILABLE) targetLocale else Locale.getDefault()
+        applyPreferredVoice(activeLocale)
+    }
+
+    fun getAvailableVoices(languageTag: String = preferredLanguageTag): List<String> {
+        if (!isReady) return emptyList()
+        val requestedLocale = Locale.forLanguageTag(languageTag)
+        return tts?.voices
+            ?.filter { voiceMatchesLocale(it, requestedLocale) }
+            ?.map { it.name }
+            ?.distinct()
+            ?.sorted()
+            .orEmpty()
+    }
 
     fun setVoiceName(name: String?) {
         preferredVoiceName = name?.takeIf { it.isNotBlank() }
-        applyPreferredVoice()
+        if (isReady) configureLanguage(Locale.forLanguageTag(preferredLanguageTag))
     }
 
-    private fun applyPreferredVoice() {
+    private fun applyPreferredVoice(activeLocale: Locale) {
         val name = preferredVoiceName ?: return
-        val selected = tts?.voices?.firstOrNull { it.name == name } ?: return
-        tts?.voice = selected
+        val selected = tts?.voices?.firstOrNull {
+            it.name == name && voiceMatchesLocale(it, activeLocale)
+        } ?: return
+        try {
+            tts?.voice = selected
+        } catch (_: IllegalArgumentException) {
+            // Retain the engine-selected default for this language.
+        }
     }
 
-    fun stop() {
-        tts?.stop()
+    private fun voiceMatchesLocale(voice: Voice, requested: Locale): Boolean =
+        voiceMatchesLocale(voice.locale, requested)
+
+    private fun voiceMatchesLocale(voiceLocale: Locale, requested: Locale): Boolean {
+        if (!voiceLocale.language.equals(requested.language, ignoreCase = true)) return false
+        return requested.country.isBlank() ||
+            voiceLocale.country.isBlank() ||
+            voiceLocale.country.equals(requested.country, ignoreCase = true)
     }
+
+    fun stop() { tts?.stop() }
 
     fun setSpeechRate(rate: Float) {
         speechRate = rate.coerceIn(0.5f, 2.0f)
@@ -123,10 +142,10 @@ class AndroidTTSEngine(private val context: Context) {
 
     fun getSpeechRate(): Float = speechRate
     fun getPitch(): Float = pitch
-
     fun isSpeaking(): Boolean = tts?.isSpeaking ?: false
 
     fun release() {
+        isReady = false
         tts?.stop()
         tts?.shutdown()
         tts = null

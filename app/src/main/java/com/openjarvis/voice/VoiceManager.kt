@@ -130,7 +130,8 @@ class VoiceManager(private val context: Context) {
         ttsEngine.setVoiceName(name)
     }
 
-    fun getAvailableTtsVoices(): List<String> = ttsEngine.getAvailableVoices()
+    fun getAvailableTtsVoices(languageTag: String = getTtsLanguage()): List<String> =
+        ttsEngine.getAvailableVoices(languageTag)
 
     fun setSpeechRate(rate: Float) {
         prefs.edit().putFloat(KEY_SPEECH_RATE, rate.coerceIn(0.5f, 2.0f)).apply()

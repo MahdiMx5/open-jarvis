@@ -463,7 +463,11 @@ fun SettingsScreen(
                                         text = { Text(label) },
                                         onClick = {
                                             ttsLanguage = tag
+                                            // Clear a custom voice selected for a different locale.
+                                            selectedTtsVoice = null
+                                            voiceManager.setTtsVoiceName(null)
                                             voiceManager.setTtsLanguage(tag)
+                                            availableTtsVoices = voiceManager.getAvailableTtsVoices(tag)
                                             OverlayService.refreshRuntimeSettings(context)
                                             showTtsLanguageMenu = false
                                         }
@@ -473,7 +477,7 @@ fun SettingsScreen(
                             Divider(color = VoidColor.BorderSubtle)
                             Row(
                                 modifier = Modifier.fillMaxWidth().clickable {
-                                    availableTtsVoices = voiceManager.getAvailableTtsVoices()
+                                    availableTtsVoices = voiceManager.getAvailableTtsVoices(ttsLanguage)
                                     showTtsVoiceMenu = true
                                 }.padding(16.dp),
                                 verticalAlignment = Alignment.CenterVertically
@@ -515,7 +519,7 @@ fun SettingsScreen(
                                 }
                                 if (availableTtsVoices.isEmpty()) {
                                     DropdownMenuItem(
-                                        text = { Text("صدایی از موتور گفتار دریافت نشد") },
+                                        text = { Text("برای این زبان صدای سازگار در موتور فعلی پیدا نشد") },
                                         onClick = { showTtsVoiceMenu = false }
                                     )
                                 }
