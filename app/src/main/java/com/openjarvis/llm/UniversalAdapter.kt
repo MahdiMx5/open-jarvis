@@ -39,11 +39,15 @@ class UniversalAdapter(private val context: Context) {
         } else {
             prefs.getString("provider_${suffix}_api_key", "") ?: ""
         }
-        val model = if (useActiveSettings) {
+        val configuredModel = if (useActiveSettings) {
             prefs.getString("provider_model", "") ?: ""
         } else {
             prefs.getString("provider_${suffix}_model", "") ?: ""
         }
+        // Move the retired legacy default to OpenRouter's maintained free-model router.
+        val model = if (name == "OpenRouter" &&
+            configuredModel == "meta-llama/llama-3-8b-instruct:free"
+        ) "openrouter/free" else configuredModel
 
         return when (name) {
             "Groq" -> GroqProvider(apiKey, model.ifBlank { getDefaultModel(name) })
@@ -134,7 +138,7 @@ class UniversalAdapter(private val context: Context) {
         fun getDefaultModel(provider: String): String = when (provider) {
             "Groq" -> "openai/gpt-oss-20b"
             "Google Gemini" -> "gemini-1.5-flash"
-            "OpenRouter" -> "meta-llama/llama-3-8b-instruct:free"
+            "OpenRouter" -> "openrouter/free"
             "Anthropic Claude" -> "claude-haiku-4-20250514"
             "OpenAI" -> "gpt-4o-mini"
             "Ollama (Local)" -> "llama3"
