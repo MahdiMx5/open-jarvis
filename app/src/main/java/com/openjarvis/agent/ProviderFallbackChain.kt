@@ -27,7 +27,7 @@ class ProviderFallbackChain(private val context: Context) {
             ).filter { adapter.isProviderConfigured(it) }
 
         if (candidates.isEmpty()) {
-            val message = "هیچ سرویس آنلاینی تنظیم نشده است. از تنظیمات، یک ارائه‌دهنده سازگار را انتخاب و کلید رسمی آن را وارد کن. ساخت حساب و احراز هویت باید طبق شرایط خود سرویس انجام شود."
+            val message = "هیچ مسیر رایگان و مجازِ آماده‌ای تنظیم نشده است. MX5 به سرویس پولی وصل نمی‌شود و هیچ پرداخت یا اشتراکی فعال نمی‌کند. برای آنلاین‌شدن، فقط یک سرویس رایگانِ واجد شرایط را از تنظیمات به‌صورت رسمی راه‌اندازی کن؛ در غیر این صورت باید منتظر بمانی تا موتور آفلاین واقعی آماده شود."
             _notification.value = message
             return Result.failure(IllegalStateException(message))
         }
@@ -37,7 +37,7 @@ class ProviderFallbackChain(private val context: Context) {
         if (ready.isEmpty()) {
             val nextAt = candidates.minOf { health.getLong(key(it, "retry_at"), now) }
             val waitMinutes = ((nextAt - now).coerceAtLeast(0L) / 60_000L).coerceAtLeast(1L)
-            val message = "سرویس‌های آنلاین موقتاً در محدودیت یا خطا هستند. MX5 دوباره پس از حدود $waitMinutes دقیقه و در درخواست بعدی امتحان می‌کند. برای افزودن سرویس دیگر، تنظیمات ارائه‌دهنده را باز کن."
+            val message = "تمام مسیرهای رایگان فعلاً در زمان انتظار هستند. MX5 حدود $waitMinutes دقیقه بعد، هنگام درخواست بعدی دوباره امتحان می‌کند. به سرویس پولی سوییچ نمی‌کند."
             _notification.value = message
             return Result.failure(IllegalStateException(message))
         }
@@ -89,7 +89,7 @@ class ProviderFallbackChain(private val context: Context) {
         val guidance = if (needsSetup) {
             " برای داشتن جایگزین‌های بیشتر، از تنظیمات یکی از سرویس‌های رایگانِ قابل‌استفاده را انتخاب کن؛ اگر حساب لازم بود، فقط از مسیر رسمی و در صورت واجد شرایط بودن اقدام کن."
         } else ""
-        val finalMessage = "سرویس‌های آماده پاسخ ندادند. برنامه در درخواست بعدی دوباره سرویس‌های خارج از زمان انتظار را امتحان می‌کند. $message$guidance"
+        val finalMessage = "هیچ‌یک از مسیرهای رایگانِ تنظیم‌شده فعلاً پاسخ ندادند. MX5 فقط در درخواست بعدی و پس از پایان زمان انتظار دوباره آن‌ها را امتحان می‌کند؛ به سرویس پولی سوییچ نمی‌کند و هزینه‌ای ایجاد نمی‌کند. $message$guidance"
         _notification.value = finalMessage
         return Result.failure(IllegalStateException(finalMessage))
     }

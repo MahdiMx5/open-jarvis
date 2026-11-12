@@ -44,10 +44,13 @@ class UniversalAdapter(private val context: Context) {
         } else {
             prefs.getString("provider_${suffix}_model", "") ?: ""
         }
-        // Move the retired legacy default to OpenRouter's maintained free-model router.
-        val model = if (name == "OpenRouter" &&
-            configuredModel == "meta-llama/llama-3-8b-instruct:free"
-        ) "openrouter/free" else configuredModel
+        // Automatic fallback is strictly limited to no-cost routes.
+        // Never allow a saved paid model selection to leak into fallback traffic.
+        val model = when (name) {
+            "OpenRouter" -> "openrouter/free"
+            "Groq" -> getDefaultModel("Groq")
+            else -> configuredModel
+        }
 
         return when (name) {
             "Groq" -> GroqProvider(apiKey, model.ifBlank { getDefaultModel(name) })
@@ -80,7 +83,8 @@ class UniversalAdapter(private val context: Context) {
             // A GGUF file alone is not a running inference engine. Keep this disabled
             // until the native llama.cpp runtime is integrated and verified.
             "Local (LlamaCpp)" -> false
-            "Ollama (Local)", "Custom" -> !url.isNullOrBlank()
+            "Ollama (Local)" -> isPrivateOrLoopbackEndpoint(url)
+            "Custom" -> !url.isNullOrBlank()
             "Cloudflare Workers AI" -> !url.isNullOrBlank() && !key.isNullOrBlank()
             else -> !key.isNullOrBlank()
         }
@@ -153,18 +157,28 @@ class UniversalAdapter(private val context: Context) {
             return modelManager?.loadModel(tier) ?: Result.failure(Exception("ModelManager not initialized"))
         }
         
-        // These endpoints implement the OpenAI-compatible chat-completions format.
-        // Free-tier availability and model access are controlled by each provider.
+        // Hard allowlist for automatic fallback. Providers whose free credits can
+        // silently roll into billable usage are intentionally excluded.
+        // OpenRouter is pinned to openrouter/free; Ollama must point to a private host.
         val FREE_FALLBACK_PROVIDERS = listOf(
             "Groq",
             "OpenRouter",
-            "Cerebras",
-            "SambaNova Cloud",
-            "NVIDIA NIM",
-            "Mistral API",
-            "Cloudflare Workers AI",
             "Ollama (Local)"
         )
+
+        private fun isPrivateOrLoopbackEndpoint(rawUrl: String?): Boolean {
+            if (rawUrl.isNullOrBlank()) return false
+            val host = runCatching { android.net.Uri.parse(rawUrl).host?.lowercase() }.getOrNull()
+                ?: return false
+            return host == "localhost" ||
+                host == "::1" ||
+                host == "127.0.0.1" ||
+                host.endsWith(".local") ||
+                host.startsWith("10.") ||
+                host.startsWith("192.168.") ||
+                (host.startsWith("172.") &&
+                    host.substringAfter("172.").substringBefore(".").toIntOrNull() in 16..31)
+        }
 
         fun getDefaultModel(provider: String): String = when (provider) {
             "Groq" -> "openai/gpt-oss-20b"

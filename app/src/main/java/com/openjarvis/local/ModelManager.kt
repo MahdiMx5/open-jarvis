@@ -105,43 +105,51 @@ class ModelManager(private val context: Context) {
                 .build()
             
             val client = okhttp3.OkHttpClient()
-            val response = client.newCall(request).execute()
-            
-            if (!response.isSuccessful && response.code != 206 && response.code != 200) {
-                throw Exception("Download failed: HTTP ${response.code}")
-            }
-            
-            val totalSize = response.header("Content-Length")?.toLongOrNull()?.let { existingSize + it } 
-                ?: tier.minSize
-            val body = response.body ?: throw Exception("Empty response")
-            
-            body.byteStream().use { input ->
-                file.outputStream().let { output ->
-                    if (existingSize > 0) {
-                        output.channel.position(existingSize)
-                    }
-                    
-                    val buffer = ByteArray(8192)
-                    var downloaded = existingSize
-                    var lastProgress = 0f
-                    
-                    while (true) {
-                        val bytes = input.read(buffer)
-                        if (bytes <= 0) break
-                        
-                        output.write(buffer, 0, bytes)
-                        downloaded += bytes
-                        
-                        val progress = downloaded.toFloat() / totalSize
-                        if (progress - lastProgress > 0.01f) {
-                            _state.value = ModelState.Downloading(tier, progress)
-                            onProgress(progress)
-                            lastProgress = progress
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) {
+                    throw Exception("Download failed: HTTP ${response.code}")
+                }
+
+                // A server may ignore Range and return 200 with the whole file.
+                // Append only for a genuine 206 partial-content response.
+                val append = existingSize > 0 && response.code == 206
+                val offset = if (append) existingSize else 0L
+                val contentLength = response.header("Content-Length")?.toLongOrNull()
+                val totalSize = contentLength?.let { offset + it } ?: tier.minSize
+                val body = response.body ?: throw Exception("Empty response")
+
+                body.byteStream().use { input ->
+                    file.outputStream().use { output ->
+                        if (append) output.channel.position(existingSize)
+                        var downloaded = offset
+                        var lastProgress = 0f
+                        val buffer = ByteArray(8192)
+
+                        while (true) {
+                            val bytes = input.read(buffer)
+                            if (bytes < 0) break
+                            if (bytes == 0) continue
+
+                            output.write(buffer, 0, bytes)
+                            downloaded += bytes
+
+                            val progress = (downloaded.toFloat() / totalSize).coerceIn(0f, 1f)
+                            if (progress - lastProgress >= 0.01f || progress >= 1f) {
+                                _state.value = ModelState.Downloading(tier, progress)
+                                onProgress(progress)
+                                lastProgress = progress
+                            }
                         }
                     }
                 }
+
+                val actualSize = file.length()
+                if (actualSize < tier.minSize) {
+                    throw Exception("Incomplete model download: $actualSize bytes")
+                }
+                actualSize
             }
-            
+
             _state.value = ModelState.Downloaded(tier)
             
             totalSize
