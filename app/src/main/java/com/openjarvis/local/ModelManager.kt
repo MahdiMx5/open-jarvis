@@ -52,11 +52,12 @@ class ModelManager(private val context: Context) {
                 throw Exception("Not enough RAM. Need ${tier.ramRequiredMB}MB free.")
             }
             
-            _state.value = ModelState.Loading(tier)
-            
-            resetUnloadTimer()
-            
-            _state.value = ModelState.Loaded(tier)
+            // Do not report a model as loaded until a real native inference runtime
+            // has opened the GGUF file and completed a generation. That runtime is
+            // not part of this build yet.
+            throw IllegalStateException(
+                "موتور اجرای مدل آفلاین هنوز به برنامه اضافه نشده است؛ دانلود مدل به‌تنهایی برای پاسخ‌گویی کافی نیست."
+            )
         }
     }
     

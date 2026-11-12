@@ -94,7 +94,7 @@ fun SettingsScreen(
     val sttModeLabel = if (sttMode == STTMode.PUSH_TO_TALK) "نگه‌داشتن میکروفون" else "پایان خودکار گفتار"
     
     LaunchedEffect(selectedProvider) {
-        showBaseUrlField = selectedProvider == "Custom"
+        showBaseUrlField = selectedProvider == "Custom" || selectedProvider == "Cloudflare Workers AI"
     }
     
     val scrollState = rememberScrollState()
@@ -176,7 +176,11 @@ fun SettingsScreen(
                 )
                 
                 Text(
-                    text = "با سرویس‌های سازگار با OpenAI کار می‌کنه",
+                    text = if (selectedProvider == "Cloudflare Workers AI")
+                        "Base URL باید شامل شناسه حساب Cloudflare و مسیر /ai/v1 باشد."
+                    else
+                        "برای فعال‌سازی سرویس، کلید رسمی را از پنل ارائه‌دهنده دریافت کن. شرایط سن و استفاده هر سرویس را رعایت کن.",
+
                     style = TextStyle(
                         fontFamily = FontFamily.Default,
                         fontWeight = FontWeight(400),
@@ -867,8 +871,7 @@ private fun TestConnectionButton(
     OutlinedButton(
         onClick = {
             when {
-                provider == "Custom" && baseUrl.isBlank() -> testState = TestState.Error("Base URL is required")
-                provider == "Ollama (Local)" && baseUrl.isBlank() -> testState = TestState.Error("Base URL is required")
+                (provider == "Custom" || provider == "Ollama (Local)" || provider == "Cloudflare Workers AI") && baseUrl.isBlank() -> testState = TestState.Error("Base URL is required")
                 provider != "Ollama (Local)" && provider != "Custom" && apiKey.isBlank() -> testState = TestState.Error("API key is required")
                 else -> {
                     onSave(provider, baseUrl, apiKey, model)

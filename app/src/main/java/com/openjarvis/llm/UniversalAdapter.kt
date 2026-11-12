@@ -55,6 +55,11 @@ class UniversalAdapter(private val context: Context) {
             "OpenRouter" -> OpenRouterProvider(apiKey, model.ifBlank { getDefaultModel(name) })
             "Anthropic Claude" -> AnthropicProvider(apiKey, model.ifBlank { getDefaultModel(name) })
             "OpenAI" -> OpenAIProvider(apiKey, model.ifBlank { getDefaultModel(name) })
+            "Cerebras" -> CustomProvider("https://api.cerebras.ai/v1", apiKey, model.ifBlank { getDefaultModel(name) })
+            "SambaNova Cloud" -> CustomProvider("https://api.sambanova.ai/v1", apiKey, model.ifBlank { getDefaultModel(name) })
+            "NVIDIA NIM" -> CustomProvider("https://integrate.api.nvidia.com/v1", apiKey, model.ifBlank { getDefaultModel(name) })
+            "Mistral API" -> CustomProvider("https://api.mistral.ai/v1", apiKey, model.ifBlank { getDefaultModel(name) })
+            "Cloudflare Workers AI" -> CustomProvider(baseUrl, apiKey, model.ifBlank { getDefaultModel(name) })
             "Ollama (Local)" -> OllamaProvider(baseUrl, model.ifBlank { getDefaultModel(name) })
             "Local (LlamaCpp)" -> {
                 val manager = getModelManager(context)
@@ -72,8 +77,10 @@ class UniversalAdapter(private val context: Context) {
         val key = if (active) prefs.getString("provider_api_key", "") else prefs.getString("provider_${suffix}_api_key", "")
         val url = if (active) prefs.getString("provider_base_url", "") else prefs.getString("provider_${suffix}_base_url", "")
         return when (name) {
-            "Local (LlamaCpp)" -> getModelManager(context).getDownloadedTier() != null
-            "Ollama (Local)", "Custom" -> !url.isNullOrBlank()
+            // A GGUF file alone is not a running inference engine. Keep this disabled
+            // until the native llama.cpp runtime is integrated and verified.
+            "Local (LlamaCpp)" -> false
+            "Ollama (Local)", "Custom", "Cloudflare Workers AI" -> !url.isNullOrBlank() && !key.isNullOrBlank()
             else -> !key.isNullOrBlank()
         }
     }
@@ -101,6 +108,11 @@ class UniversalAdapter(private val context: Context) {
             putString("provider_model", model)
             apply()
         }
+        // A changed key or endpoint should be retried immediately, not held by an old cooldown.
+        context.getSharedPreferences("provider_health", Context.MODE_PRIVATE).edit()
+            .remove("${suffix}_retry_at")
+            .remove("${suffix}_failures")
+            .apply()
     }
 
 
@@ -116,6 +128,11 @@ class UniversalAdapter(private val context: Context) {
             "OpenRouter",
             "Anthropic Claude",
             "OpenAI",
+            "Cerebras",
+            "SambaNova Cloud",
+            "NVIDIA NIM",
+            "Mistral API",
+            "Cloudflare Workers AI",
             "Ollama (Local)",
             "Local (LlamaCpp)",
             "Custom"
@@ -135,12 +152,30 @@ class UniversalAdapter(private val context: Context) {
             return modelManager?.loadModel(tier) ?: Result.failure(Exception("ModelManager not initialized"))
         }
         
+        // These endpoints implement the OpenAI-compatible chat-completions format.
+        // Free-tier availability and model access are controlled by each provider.
+        val FREE_FALLBACK_PROVIDERS = listOf(
+            "Groq",
+            "OpenRouter",
+            "Cerebras",
+            "SambaNova Cloud",
+            "NVIDIA NIM",
+            "Mistral API",
+            "Cloudflare Workers AI",
+            "Ollama (Local)"
+        )
+
         fun getDefaultModel(provider: String): String = when (provider) {
             "Groq" -> "openai/gpt-oss-20b"
             "Google Gemini" -> "gemini-1.5-flash"
             "OpenRouter" -> "openrouter/free"
             "Anthropic Claude" -> "claude-haiku-4-20250514"
             "OpenAI" -> "gpt-4o-mini"
+            "Cerebras" -> "llama3.1-8b"
+            "SambaNova Cloud" -> "Meta-Llama-3.3-70B-Instruct"
+            "NVIDIA NIM" -> "meta/llama-3.1-8b-instruct"
+            "Mistral API" -> "mistral-small-latest"
+            "Cloudflare Workers AI" -> "@cf/meta/llama-3.1-8b-instruct"
             "Ollama (Local)" -> "llama3"
             else -> "gpt-4o-mini"
         }
