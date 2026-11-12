@@ -34,7 +34,7 @@ private fun readProviderResponse(response: okhttp3.Response, providerName: Strin
 
 class OpenRouterProvider(
     private val apiKey: String,
-    private val model: String = "meta-llama/llama-3-8b-instruct:free"
+    private val model: String = "openrouter/free"
 ) : LLMProvider {
     
     override val name: String = "OpenRouter"
