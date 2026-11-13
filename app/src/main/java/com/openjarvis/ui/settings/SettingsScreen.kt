@@ -42,6 +42,7 @@ import android.content.Intent
 import android.provider.Settings
 import android.net.Uri
 import android.speech.SpeechRecognizer
+import android.speech.tts.TextToSpeech
 import com.openjarvis.BuildConfig
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.sp
@@ -345,6 +346,26 @@ fun SettingsScreen(
                         },
                         valueRange = 0.5f..2.0f
                     )
+
+                    Text(
+                        text = if (voiceManager.isTtsLanguageAvailable(ttsLanguage))
+                            "زبان انتخاب‌شده در موتور گفتار گوشی موجود است."
+                        else
+                            "صدای این زبان روی موتور گفتار گوشی نصب یا پشتیبانی نمی‌شود؛ برنامه صدای زبان دیگری را جایگزین نمی‌کند.",
+                        color = if (voiceManager.isTtsLanguageAvailable(ttsLanguage)) VoidColor.Green else VoidColor.Amber,
+                        fontSize = 11.sp
+                    )
+                    OutlinedButton(
+                        onClick = {
+                            runCatching {
+                                context.startActivity(Intent(TextToSpeech.Engine.ACTION_INSTALL_TTS_DATA))
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("مدیریت و نصب داده‌های صدای گوشی")
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
 
                     Button(
                         onClick = {

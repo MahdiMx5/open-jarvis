@@ -48,7 +48,7 @@ class AndroidTTSEngine(private val context: Context) {
             .trim()
         if (clean.isBlank()) return
 
-        selectLanguageFor(clean)
+        if (!selectLanguageFor(clean)) return
         val utteranceId = "jarvis_${UUID.randomUUID()}"
         if (onDone != null) completionCallbacks[utteranceId] = onDone
         val result = tts?.speak(clean, TextToSpeech.QUEUE_FLUSH, null, utteranceId)
@@ -74,20 +74,26 @@ class AndroidTTSEngine(private val context: Context) {
         if (isReady) configureLanguage(Locale.forLanguageTag(preferredLanguageTag))
     }
 
-    private fun selectLanguageFor(text: String) {
+    private fun selectLanguageFor(text: String): Boolean {
         val targetLocale = if (text.any { it.code in 0x0600..0x06FF }) {
             Locale.forLanguageTag("fa-IR")
         } else {
             Locale.forLanguageTag(preferredLanguageTag)
         }
-        configureLanguage(targetLocale)
+        return configureLanguage(targetLocale)
     }
 
-    private fun configureLanguage(targetLocale: Locale) {
-        val engine = tts ?: return
+    private fun configureLanguage(targetLocale: Locale): Boolean {
+        val engine = tts ?: return false
         val result = engine.setLanguage(targetLocale)
-        val activeLocale = if (result >= TextToSpeech.LANG_AVAILABLE) targetLocale else Locale.getDefault()
-        applyPreferredVoice(activeLocale)
+        if (result < TextToSpeech.LANG_AVAILABLE) return false
+        applyPreferredVoice(targetLocale)
+        return true
+    }
+
+    fun isLanguageAvailable(languageTag: String = preferredLanguageTag): Boolean {
+        val engine = tts ?: return false
+        return engine.isLanguageAvailable(Locale.forLanguageTag(languageTag)) >= TextToSpeech.LANG_AVAILABLE
     }
 
     fun getAvailableVoices(languageTag: String = preferredLanguageTag): List<String> {

@@ -135,7 +135,7 @@ fun DashboardScreen(
                 val loaded = withContext(Dispatchers.IO) {
                     runCatching {
                         context.contentResolver.openInputStream(uri)?.bufferedReader(Charsets.UTF_8)?.use {
-                            it.readText().take(30000)
+                            it.readText().take(80000)
                         } ?: throw IllegalStateException("خواندن فایل ممکن نشد")
                     }
                 }
