@@ -21,8 +21,8 @@ class AndroidSTTEngine(private val context: Context) : STTEngine {
     companion object {
         const val SAMPLE_RATE = 16000
         const val SILENCE_THRESHOLD = 500
-        const val SILENCE_TIMEOUT_MS = 1500L
-        const val MAX_RECORDING_MS = 30000L
+        const val SILENCE_TIMEOUT_MS = 3500L
+        const val MAX_RECORDING_MS = 60000L
     }
 
     private var recognizer: SpeechRecognizer? = null

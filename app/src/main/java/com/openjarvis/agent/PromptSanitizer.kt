@@ -14,7 +14,7 @@ object PromptSanitizer {
         Regex("DAN mode", RegexOption.IGNORE_CASE)
     )
     
-    private const val MAX_COMMAND_LENGTH = 2000
+    private const val MAX_COMMAND_LENGTH = 35000
     
     fun sanitize(input: String): SanitizeResult {
         val trimmed = input.trim()
