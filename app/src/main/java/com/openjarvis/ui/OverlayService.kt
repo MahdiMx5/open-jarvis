@@ -8,7 +8,6 @@ import android.view.Gravity
 import android.view.WindowManager
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.ui.input.pointer.consume
 import android.graphics.PixelFormat
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
