@@ -6,6 +6,9 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.view.Gravity
 import android.view.WindowManager
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.ui.input.pointer.consume
 import android.graphics.PixelFormat
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -158,6 +161,17 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner {
 
         try {
             val manager = getSystemService(WINDOW_SERVICE) as WindowManager
+            val params = WindowManager.LayoutParams(
+                WindowManager.LayoutParams.MATCH_PARENT,
+                WindowManager.LayoutParams.WRAP_CONTENT,
+                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
+                    WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+                PixelFormat.TRANSLUCENT
+            ).apply {
+                gravity = Gravity.TOP or Gravity.END
+                y = (72 * resources.displayMetrics.density).toInt()
+            }
             val view = ComposeView(this).apply {
                 setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindow)
                 setViewTreeLifecycleOwner(this@OverlayService)
@@ -166,7 +180,17 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner {
                     OpenJarvisTheme {
                         val state by agentCore.state.collectAsState()
                         Box(
-                            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 12.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 12.dp, vertical = 12.dp)
+                                .pointerInput(Unit) {
+                                    detectDragGestures { change, dragAmount ->
+                                        change.consume()
+                                        params.x = (params.x - dragAmount.x.toInt()).coerceAtLeast(0)
+                                        params.y = (params.y + dragAmount.y.toInt()).coerceAtLeast(0)
+                                        runCatching { manager.updateViewLayout(view, params) }
+                                    }
+                                },
                             contentAlignment = Alignment.TopEnd
                         ) {
                             FloatingOverlayWidget(
@@ -179,17 +203,6 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner {
                         }
                     }
                 }
-            }
-            val params = WindowManager.LayoutParams(
-                WindowManager.LayoutParams.MATCH_PARENT,
-                WindowManager.LayoutParams.WRAP_CONTENT,
-                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
-                    WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
-                PixelFormat.TRANSLUCENT
-            ).apply {
-                gravity = Gravity.TOP or Gravity.END
-                y = (72 * resources.displayMetrics.density).toInt()
             }
             manager.addView(view, params)
             windowManager = manager
