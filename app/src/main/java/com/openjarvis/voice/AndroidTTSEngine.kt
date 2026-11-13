@@ -63,7 +63,7 @@ class AndroidTTSEngine(private val context: Context) {
             .trim()
         if (clean.isBlank()) return
 
-        selectLanguageFor(clean)
+        if (!selectLanguageFor(clean)) return
         val utteranceId = "jarvis_${UUID.randomUUID()}"
         tts?.speak(clean, TextToSpeech.QUEUE_ADD, null, utteranceId)
     }
