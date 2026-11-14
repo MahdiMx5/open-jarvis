@@ -97,16 +97,18 @@ class AndroidSTTEngine(private val context: Context) : STTEngine {
                         return
                     }
                     val errorMessage = when (error) {
-                        SpeechRecognizer.ERROR_AUDIO -> "Audio recording error"
-                        SpeechRecognizer.ERROR_CLIENT -> "Client error"
-                        SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "Missing permissions"
-                        SpeechRecognizer.ERROR_NETWORK -> "Network error"
-                        SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> "Network timeout"
-                        SpeechRecognizer.ERROR_NO_MATCH -> "No speech detected"
-                        SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "Recognizer busy"
-                        SpeechRecognizer.ERROR_SERVER -> "Server error"
-                        SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "Speech timeout"
-                        else -> "Unknown error"
+                        SpeechRecognizer.ERROR_AUDIO -> "خطا در دریافت صدای میکروفون"
+                        SpeechRecognizer.ERROR_CLIENT -> "ارتباط با سرویس تشخیص گفتار قطع شد؛ دوباره تلاش کن"
+                        SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "اجازه استفاده از میکروفون داده نشده است"
+                        SpeechRecognizer.ERROR_NETWORK -> "اتصال شبکه برای تشخیص گفتار در دسترس نیست"
+                        SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> "پاسخ سرویس تشخیص گفتار بیش از حد طول کشید"
+                        SpeechRecognizer.ERROR_NO_MATCH -> "گفتاری تشخیص داده نشد؛ واضح‌تر و دوباره صحبت کن"
+                        SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "سرویس تشخیص گفتار مشغول است؛ چند لحظه بعد تلاش کن"
+                        SpeechRecognizer.ERROR_SERVER -> "سرویس تشخیص گفتار خطا داد"
+                        SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "صدایی دریافت نشد"
+                        SpeechRecognizer.ERROR_LANGUAGE_NOT_SUPPORTED -> "زبان انتخاب‌شده توسط سرویس تشخیص گفتار پشتیبانی نمی‌شود"
+                        SpeechRecognizer.ERROR_LANGUAGE_UNAVAILABLE -> "بسته زبان انتخاب‌شده نصب یا در دسترس نیست"
+                        else -> "خطای ناشناخته در تشخیص گفتار"
                     }
                     if (pendingResult.isNullOrBlank()) {
                         currentErrorCallback?.invoke(errorMessage)
