@@ -202,7 +202,6 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner {
                         }
                     }
                 }
-            }
             manager.addView(view, params)
             windowManager = manager
             overlayView = view
