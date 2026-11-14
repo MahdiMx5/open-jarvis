@@ -95,6 +95,11 @@ jobs:
           print("Google Sign-In Web client ID configured.")
           PY
 
+      - name: Run unit tests
+        run: |
+          chmod +x ./gradlew
+          ./gradlew :app:testDebugUnitTest --no-daemon --max-workers=2 --stacktrace -Dorg.gradle.jvmargs="-Xmx3g -XX:MaxMetaspaceSize=1g -Dfile.encoding=UTF-8"
+
       - name: Build Debug APK
         run: |
           chmod +x ./gradlew
