@@ -615,7 +615,13 @@ fun SettingsScreen(
                 Spacer(modifier = Modifier.height(12.dp))
                 
                 AboutSection()
-                
+
+                Spacer(modifier = Modifier.height(32.dp))
+
+                SectionLabel("پشتیبانی MX5")
+                Spacer(modifier = Modifier.height(12.dp))
+                SupportSection()
+
                 Spacer(modifier = Modifier.height(32.dp))
             }
         }
@@ -1171,6 +1177,66 @@ private fun PermissionRow(
                 contentDescription = null,
                 tint = statusColor
             )
+        }
+    }
+}
+
+@Composable
+private fun SupportSection() {
+    val context = LocalContext.current
+    val email = "mahdi.heydari.16.az86@gmail.com"
+    val whatsappNumber = "989945168729"
+    val supportMessage = "سلام، برای راه‌اندازی اتصال هوش مصنوعی MX5 به راهنمایی نیاز دارم."
+
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        color = VoidColor.Void900,
+        border = BorderStroke(1.dp, VoidColor.BorderSubtle)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = "اگر اتصال آنلاین رایگان در دسترس نبود، از این بخش برای دریافت راهنمای راه‌اندازی استفاده کن. کلید API یا رمز حساب را برای پشتیبانی ارسال نکن.",
+                color = VoidColor.TextSecondary,
+                fontSize = 12.sp
+            )
+            Spacer(modifier = Modifier.height(14.dp))
+            Text(
+                text = "ایمیل: $email",
+                color = VoidColor.TextPrimary,
+                fontSize = 13.sp
+            )
+            Spacer(modifier = Modifier.height(10.dp))
+            Text(
+                text = "واتساپ: +98 994 516 8729",
+                color = VoidColor.TextPrimary,
+                fontSize = 13.sp
+            )
+            Spacer(modifier = Modifier.height(14.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedButton(
+                    modifier = Modifier.weight(1f),
+                    onClick = {
+                        val intent = Intent(Intent.ACTION_SENDTO).apply {
+                            data = Uri.parse("mailto:$email")
+                            putExtra(Intent.EXTRA_SUBJECT, "درخواست راه‌اندازی MX5")
+                            putExtra(Intent.EXTRA_TEXT, supportMessage)
+                        }
+                        runCatching { context.startActivity(intent) }
+                    }
+                ) {
+                    Text("ارسال ایمیل")
+                }
+                Button(
+                    modifier = Modifier.weight(1f),
+                    onClick = {
+                        val url = "https://wa.me/$whatsappNumber?text=" + Uri.encode(supportMessage)
+                        runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
+                    }
+                ) {
+                    Text("واتساپ")
+                }
+            }
         }
     }
 }

@@ -171,34 +171,35 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner {
                 gravity = Gravity.TOP or Gravity.END
                 y = (72 * resources.displayMetrics.density).toInt()
             }
-            val view = ComposeView(this)
-            view.setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindow)
-            view.setViewTreeLifecycleOwner(this@OverlayService)
-            view.setViewTreeSavedStateRegistryOwner(this@OverlayService)
-            view.setContent {
-                OpenJarvisTheme {
-                    val state by agentCore.state.collectAsState()
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 12.dp, vertical = 12.dp)
-                            .pointerInput(Unit) {
-                                detectDragGestures { change, dragAmount ->
-                                    change.consume()
-                                    params.x = (params.x - dragAmount.x.toInt()).coerceAtLeast(0)
-                                    params.y = (params.y + dragAmount.y.toInt()).coerceAtLeast(0)
-                                    runCatching { manager.updateViewLayout(view, params) }
-                                }
-                            },
-                        contentAlignment = Alignment.TopEnd
-                    ) {
-                        FloatingOverlayWidget(
-                            agentState = state,
-                            voiceManager = voiceManager,
-                            recentTasks = recentTaskItems,
-                            onCommand = { command -> executeCommand(command) },
-                            onCollapse = {}
-                        )
+            val view = ComposeView(this).apply {
+                setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindow)
+                setViewTreeLifecycleOwner(this@OverlayService)
+                setViewTreeSavedStateRegistryOwner(this@OverlayService)
+                setContent {
+                    OpenJarvisTheme {
+                        val state by agentCore.state.collectAsState()
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 12.dp, vertical = 12.dp)
+                                .pointerInput(Unit) {
+                                    detectDragGestures { change, dragAmount ->
+                                        change.consume()
+                                        params.x = (params.x - dragAmount.x.toInt()).coerceAtLeast(0)
+                                        params.y = (params.y + dragAmount.y.toInt()).coerceAtLeast(0)
+                                        runCatching { manager.updateViewLayout(view, params) }
+                                    }
+                                },
+                            contentAlignment = Alignment.TopEnd
+                        ) {
+                            FloatingOverlayWidget(
+                                agentState = state,
+                                voiceManager = voiceManager,
+                                recentTasks = recentTaskItems,
+                                onCommand = { command -> executeCommand(command) },
+                                onCollapse = {}
+                            )
+                        }
                     }
                 }
             }
