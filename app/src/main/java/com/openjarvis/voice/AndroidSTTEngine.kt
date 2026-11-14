@@ -10,6 +10,7 @@ import android.os.Handler
 import android.os.Looper
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
+import android.speech.RecognitionSupportCallback
 import android.speech.SpeechRecognizer
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -152,16 +153,93 @@ class AndroidSTTEngine(private val context: Context) : STTEngine {
         }.also { it.setRecognitionListener(recognitionListener) }
     }
 
-    private fun createRecognitionIntent(): Intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+    private fun createRecognitionIntent(languageTag: String = recognitionLanguage): Intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
         putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-        putExtra(RecognizerIntent.EXTRA_LANGUAGE, recognitionLanguage)
-        putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, recognitionLanguage)
+        putExtra(RecognizerIntent.EXTRA_LANGUAGE, languageTag)
+        putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, languageTag)
         putExtra(RecognizerIntent.EXTRA_ONLY_RETURN_LANGUAGE_PREFERENCE, false)
         putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
         putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
         putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, SILENCE_TIMEOUT_MS)
     }
 
+
+    data class LanguageSupport(
+        val installedOnDevice: Boolean,
+        val downloadableOnDevice: Boolean,
+        val pendingOnDevice: Boolean,
+        val availableOnline: Boolean
+    )
+
+    /**
+     * Queries the active Android recognition service. Android 13+ exposes
+     * installed, downloadable, pending and online language lists separately.
+     */
+    fun checkLanguageSupport(languageTag: String, callback: (Result<LanguageSupport>) -> Unit) {
+        if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.TIRAMISU) {
+            callback(Result.failure(IllegalStateException("بررسی مدل زبان به اندروید ۱۳ یا جدیدتر نیاز دارد.")))
+            return
+        }
+        mainHandler.post {
+            val probe = runCatching { SpeechRecognizer.createSpeechRecognizer(context) }.getOrElse {
+                callback(Result.failure(it))
+                return@post
+            }
+            try {
+                probe.checkRecognitionSupport(
+                    createRecognitionIntent(languageTag),
+                    context.mainExecutor,
+                    object : RecognitionSupportCallback {
+                        override fun onSupportResult(support: android.speech.RecognitionSupport) {
+                            val tags = listOf(languageTag, Locale.forLanguageTag(languageTag).language)
+                            fun contains(values: List<String>): Boolean =
+                                values.any { value -> tags.any { tag -> value.equals(tag, true) } }
+                            callback(Result.success(LanguageSupport(
+                                installedOnDevice = contains(support.installedOnDeviceLanguages),
+                                downloadableOnDevice = contains(support.supportedOnDeviceLanguages),
+                                pendingOnDevice = contains(support.pendingOnDeviceLanguages),
+                                availableOnline = contains(support.onlineLanguages)
+                            )))
+                            probe.destroy()
+                        }
+
+                        override fun onError(error: Int) {
+                            callback(Result.failure(IllegalStateException("بررسی زبان در سرویس گفتار ناموفق بود (کد $error).")))
+                            probe.destroy()
+                        }
+                    }
+                )
+            } catch (error: Exception) {
+                probe.destroy()
+                callback(Result.failure(error))
+            }
+        }
+    }
+
+    /**
+     * Requests the Android recognition service to download the selected
+     * language model. Android may schedule the request instead of starting it.
+     */
+    fun requestLanguageModelDownload(languageTag: String, callback: (Result<Unit>) -> Unit) {
+        if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.TIRAMISU) {
+            callback(Result.failure(IllegalStateException("درخواست دانلود مدل زبان به اندروید ۱۳ یا جدیدتر نیاز دارد.")))
+            return
+        }
+        mainHandler.post {
+            val probe = runCatching { SpeechRecognizer.createSpeechRecognizer(context) }.getOrElse {
+                callback(Result.failure(it))
+                return@post
+            }
+            try {
+                probe.triggerModelDownload(createRecognitionIntent(languageTag))
+                callback(Result.success(Unit))
+            } catch (error: Exception) {
+                callback(Result.failure(error))
+            } finally {
+                mainHandler.postDelayed({ runCatching { probe.destroy() } }, 1500L)
+            }
+        }
+    }
 
     override fun startListening(onResult: (String?) -> Unit, onError: (String) -> Unit) {
         currentCallback = onResult

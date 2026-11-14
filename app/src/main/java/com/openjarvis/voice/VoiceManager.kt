@@ -136,6 +136,14 @@ class VoiceManager(private val context: Context) {
     fun isTtsLanguageAvailable(languageTag: String = getTtsLanguage()): Boolean =
         ttsEngine.isLanguageAvailable(languageTag)
 
+    fun checkRecognitionLanguage(languageTag: String, callback: (Result<AndroidSTTEngine.LanguageSupport>) -> Unit) {
+        sttEngine.checkLanguageSupport(languageTag, callback)
+    }
+
+    fun requestRecognitionLanguageDownload(languageTag: String, callback: (Result<Unit>) -> Unit) {
+        sttEngine.requestLanguageModelDownload(languageTag, callback)
+    }
+
     fun setSpeechRate(rate: Float) {
         prefs.edit().putFloat(KEY_SPEECH_RATE, rate.coerceIn(0.5f, 2.0f)).apply()
         ttsEngine.setSpeechRate(rate)

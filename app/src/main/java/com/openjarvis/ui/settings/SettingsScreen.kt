@@ -94,6 +94,9 @@ fun SettingsScreen(
     var showLanguageMenu by remember { mutableStateOf(false) }
     var showTtsLanguageMenu by remember { mutableStateOf(false) }
     var showTtsVoiceMenu by remember { mutableStateOf(false) }
+    var recognitionSupportStatus by remember { mutableStateOf("وضعیت پشتیبانی زبان هنوز بررسی نشده است.") }
+    var isCheckingRecognitionSupport by remember { mutableStateOf(false) }
+    var isRequestingRecognitionDownload by remember { mutableStateOf(false) }
     val sttModeLabel = if (sttMode == STTMode.PUSH_TO_TALK) "نگه‌داشتن میکروفون" else "پایان خودکار گفتار"
     
     LaunchedEffect(selectedProvider) {
@@ -440,6 +443,52 @@ fun SettingsScreen(
                         }
                     }
                     Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = recognitionSupportStatus,
+                        color = VoidColor.TextSecondary,
+                        fontSize = 11.sp
+                    )
+                    OutlinedButton(
+                        onClick = {
+                            isCheckingRecognitionSupport = true
+                            recognitionSupportStatus = "در حال بررسی پشتیبانی سرویس گفتار..."
+                            voiceManager.checkRecognitionLanguage(recognitionLanguage) { result ->
+                                isCheckingRecognitionSupport = false
+                                recognitionSupportStatus = result.fold(
+                                    onSuccess = { support ->
+                                        when {
+                                            support.installedOnDevice -> "مدل آفلاین این زبان روی دستگاه نصب و آماده است."
+                                            support.pendingOnDevice -> "دانلود مدل آفلاین این زبان قبلاً زمان‌بندی شده است."
+                                            support.downloadableOnDevice -> "این زبان برای تشخیص آفلاین پشتیبانی می‌شود و مدل آن هنوز نصب نیست."
+                                            support.availableOnline -> "این زبان فقط از مسیر آنلاین سرویس گفتار در دسترس اعلام شده است."
+                                            else -> "سرویس فعلی پشتیبانی فارسی را اعلام نکرده است."
+                                        }
+                                    },
+                                    onFailure = { it.message ?: "بررسی پشتیبانی زبان ناموفق بود." }
+                                )
+                            }
+                        },
+                        enabled = !isCheckingRecognitionSupport,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(if (isCheckingRecognitionSupport) "در حال بررسی..." else "بررسی پشتیبانی گفتار فارسی")
+                    }
+                    OutlinedButton(
+                        onClick = {
+                            isRequestingRecognitionDownload = true
+                            voiceManager.requestRecognitionLanguageDownload(recognitionLanguage) { result ->
+                                isRequestingRecognitionDownload = false
+                                recognitionSupportStatus = result.fold(
+                                    onSuccess = { "درخواست دانلود به سرویس اندروید ارسال شد؛ برای دیدن وضعیت، دوباره بررسی کن. ارسال درخواست به معنی شروع یا تکمیل دانلود نیست." },
+                                    onFailure = { it.message ?: "ارسال درخواست دانلود ناموفق بود." }
+                                )
+                            }
+                        },
+                        enabled = !isRequestingRecognitionDownload,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(if (isRequestingRecognitionDownload) "در حال ارسال درخواست..." else "درخواست دریافت مدل گفتار")
+                    }
 
                     Surface(
                         modifier = Modifier.fillMaxWidth(),
