@@ -100,7 +100,7 @@ fun OnboardingScreen(onComplete: () -> Unit) {
                 ) {
                     if (currentScreen > 0 && currentScreen < 4) {
                         TextButton(onClick = { currentScreen-- }) {
-                            Text("Back", color = VoidColor.TextDisabled)
+                            Text("بازگشت", color = VoidColor.TextDisabled)
                         }
                     } else {
                         Spacer(modifier = Modifier.width(1.dp))
@@ -108,7 +108,7 @@ fun OnboardingScreen(onComplete: () -> Unit) {
                     
                     if (currentScreen < 4) {
                         TextButton(onClick = { currentScreen++ }) {
-                            Text("Skip", color = VoidColor.TextDisabled)
+                            Text("رد کردن", color = VoidColor.TextDisabled)
                         }
                     }
                 }
@@ -136,7 +136,7 @@ private fun WelcomeScreen(onGetStarted: () -> Unit) {
         Spacer(modifier = Modifier.height(32.dp))
         
         Text(
-            text = "Your AI. Your Phone.\nYour Control.",
+            text = "هوش مصنوعی تو.\nکنترل بیشتر روی گوشی.",
             fontSize = 20.sp,
             color = VoidColor.TextPrimary,
             textAlign = TextAlign.Center
@@ -145,7 +145,7 @@ private fun WelcomeScreen(onGetStarted: () -> Unit) {
         Spacer(modifier = Modifier.height(16.dp))
         
         Text(
-            text = "Give Jarvis a prompt.\nIt handles everything.",
+            text = "درخواستت را بنویس یا بگو؛\nجارویس در انجام کارها کمکت می‌کند.",
             fontSize = 14.sp,
             color = VoidColor.TextDisabled,
             textAlign = TextAlign.Center
@@ -161,7 +161,7 @@ private fun WelcomeScreen(onGetStarted: () -> Unit) {
             shape = RoundedCornerShape(12.dp)
         ) {
             Text(
-                text = "Get Started",
+                text = "شروع کنیم",
                 modifier = Modifier.padding(horizontal = 32.dp, vertical = 8.dp)
             )
         }
@@ -174,7 +174,7 @@ private fun PermissionsScreen(onBack: () -> Unit, onContinue: () -> Unit) {
         modifier = Modifier.fillMaxSize()
     ) {
         Text(
-            text = "Permissions",
+            text = "دسترسی‌های موردنیاز",
             fontSize = 24.sp,
             fontWeight = FontWeight.Bold,
             color = VoidColor.TextPrimary
@@ -183,16 +183,16 @@ private fun PermissionsScreen(onBack: () -> Unit, onContinue: () -> Unit) {
         Spacer(modifier = Modifier.height(8.dp))
         
         Text(
-            text = "Jarvis needs a few permissions to control your device",
+            text = "برای کنترل بعضی بخش‌های گوشی، باید دسترسی‌ها را جداگانه و با اجازه‌ی خودت فعال کنی.",
             fontSize = 14.sp,
             color = VoidColor.TextDisabled
         )
         
         Spacer(modifier = Modifier.height(32.dp))
         
-        PermissionRow("Accessibility Service", "Required to tap, type, and control apps")
-        PermissionRow("Overlay Permission", "Required to show the floating control pill")
-        PermissionRow("Notification Access", "Required to read and reply to messages")
+        PermissionRow("دسترسی‌پذیری", "برای خواندن محتوای صفحه و اجرای بعضی فرمان‌ها؛ هنوز همه‌ی قابلیت‌ها پیاده‌سازی نشده‌اند")
+        PermissionRow("نمایش روی برنامه‌ها", "برای نمایش پنجره‌ی شناور MX5")
+        PermissionRow("دسترسی اعلان‌ها", "فقط در صورت نیاز به خواندن اعلان‌ها و با اجازه‌ی تو")
         
         Spacer(modifier = Modifier.weight(1f))
         
@@ -201,7 +201,7 @@ private fun PermissionsScreen(onBack: () -> Unit, onContinue: () -> Unit) {
             colors = ButtonDefaults.buttonColors(containerColor = VoidColor.Cyan),
             modifier = Modifier.fillMaxWidth()
         ) {
-            Text("Continue")
+            Text("ادامه")
         }
     }
 }
@@ -239,7 +239,7 @@ private fun ProviderScreen(onBack: () -> Unit, onContinue: () -> Unit, onSkip: (
         modifier = Modifier.fillMaxSize()
     ) {
         Text(
-            text = "Choose Your AI",
+            text = "انتخاب سرویس هوش مصنوعی",
             fontSize = 24.sp,
             fontWeight = FontWeight.Bold,
             color = VoidColor.TextPrimary
@@ -248,7 +248,7 @@ private fun ProviderScreen(onBack: () -> Unit, onContinue: () -> Unit, onSkip: (
         Spacer(modifier = Modifier.height(8.dp))
         
         Text(
-            text = "Connect an AI brain",
+            text = "برای استفاده‌ی آنلاین، سرویس و کلید معتبر لازم است؛ سهمیه‌ی رایگان به قوانین همان سرویس بستگی دارد.",
             fontSize = 14.sp,
             color = VoidColor.TextDisabled
         )
@@ -259,8 +259,8 @@ private fun ProviderScreen(onBack: () -> Unit, onContinue: () -> Unit, onSkip: (
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            ProviderCard("Groq", "Free · Fast", Modifier.weight(1f))
-            ProviderCard("Gemini", "Free tier", Modifier.weight(1f))
+            ProviderCard("Groq", "نیازمند کلید و سهمیه‌ی فعال", Modifier.weight(1f))
+            ProviderCard("Gemini", "نیازمند دسترسی و کلید معتبر", Modifier.weight(1f))
         }
         
         Spacer(modifier = Modifier.height(8.dp))
@@ -269,8 +269,8 @@ private fun ProviderScreen(onBack: () -> Unit, onContinue: () -> Unit, onSkip: (
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            ProviderCard("OpenRouter", "Free models", Modifier.weight(1f))
-            ProviderCard("Local", "Offline", Modifier.weight(1f))
+            ProviderCard("OpenRouter", "مدل رایگان ممکن است محدود باشد", Modifier.weight(1f))
+            ProviderCard("آفلاین", "موتور اجرا هنوز آماده نیست", Modifier.weight(1f))
         }
         
         Spacer(modifier = Modifier.weight(1f))
@@ -304,77 +304,25 @@ private fun ProviderCard(name: String, subtitle: String, modifier: Modifier = Mo
 
 @Composable
 private fun TryItScreen(onBack: () -> Unit, onSuccess: () -> Unit) {
-    val coroutineScope = rememberCoroutineScope()
-    var command by remember { mutableStateOf("Open Chrome and search for weather") }
-    var isRunning by remember { mutableStateOf(false) }
-    
     Column(
-        modifier = Modifier.fillMaxSize()
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        Text(text = "آماده‌ی راه‌اندازی", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = VoidColor.TextPrimary)
+        Spacer(modifier = Modifier.height(16.dp))
         Text(
-            text = "Try It",
-            fontSize = 24.sp,
-            fontWeight = FontWeight.Bold,
-            color = VoidColor.TextPrimary
-        )
-        
-        Spacer(modifier = Modifier.height(8.dp))
-        
-        Text(
-            text = "Let's try your first prompt",
+            text = "این صفحه فرمان آزمایشی اجرا نمی‌کند و موفقیت ساختگی نشان نمی‌دهد. بعد از ورود، اتصال سرویس هوش مصنوعی و دسترسی‌های موردنیاز را از تنظیمات بررسی کن.",
             fontSize = 14.sp,
-            color = VoidColor.TextDisabled
+            color = VoidColor.TextDisabled,
+            textAlign = TextAlign.Center
         )
-        
-        Spacer(modifier = Modifier.height(24.dp))
-        
-        OutlinedTextField(
-            value = command,
-            onValueChange = { command = it },
-            modifier = Modifier.fillMaxWidth(),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = VoidColor.Cyan,
-                unfocusedBorderColor = VoidColor.BorderSubtle
-            ),
-            placeholder = { Text("Type your command...") }
-        )
-        
-        Spacer(modifier = Modifier.height(16.dp))
-        
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f)
-                .background(VoidColor.Void900, RoundedCornerShape(12.dp)),
-            contentAlignment = Alignment.Center
-        ) {
-            if (isRunning) {
-                CircularProgressIndicator(color = VoidColor.Cyan)
-            } else {
-                Text(
-                    "Press Run to execute",
-                    color = VoidColor.TextDisabled
-                )
-            }
-        }
-        
-        Spacer(modifier = Modifier.height(16.dp))
-        
+        Spacer(modifier = Modifier.height(32.dp))
         Button(
-            onClick = {
-                isRunning = true
-                coroutineScope.launch {
-                    delay(2000)
-                    isRunning = false
-                    onSuccess()
-                }
-            },
+            onClick = onSuccess,
             colors = ButtonDefaults.buttonColors(containerColor = VoidColor.Cyan),
-            modifier = Modifier.fillMaxWidth(),
-            enabled = !isRunning
-        ) {
-            Text(if (isRunning) "Running..." else "Run This")
-        }
+            modifier = Modifier.fillMaxWidth()
+        ) { Text("ورود به برنامه") }
     }
 }
 
@@ -395,7 +343,7 @@ private fun ReadyScreen(onStart: () -> Unit) {
         Spacer(modifier = Modifier.height(24.dp))
         
         Text(
-            text = "You're Ready",
+            text = "آماده‌ی شروع",
             fontSize = 24.sp,
             fontWeight = FontWeight.Bold,
             color = VoidColor.TextPrimary
@@ -404,7 +352,7 @@ private fun ReadyScreen(onStart: () -> Unit) {
         Spacer(modifier = Modifier.height(8.dp))
         
         Text(
-            text = "Jarvis is ready to help you",
+            text = "برنامه نصب شده؛ بعضی قابلیت‌ها هنوز در حال تکمیل هستند.",
             fontSize = 14.sp,
             color = VoidColor.TextDisabled
         )
@@ -417,7 +365,7 @@ private fun ReadyScreen(onStart: () -> Unit) {
             shape = RoundedCornerShape(12.dp)
         ) {
             Text(
-                text = "Start Using Jarvis",
+                text = "ورود به MX5",
                 modifier = Modifier.padding(horizontal = 32.dp, vertical = 8.dp)
             )
         }
