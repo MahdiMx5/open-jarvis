@@ -125,7 +125,7 @@ private fun WelcomeScreen(onGetStarted: () -> Unit) {
         verticalArrangement = Arrangement.Center
     ) {
         Text(
-            text = "OPEN\nJARVIS",
+            text = "MX5",
             fontSize = 48.sp,
             fontWeight = FontWeight.Bold,
             color = VoidColor.Cyan,
@@ -280,7 +280,7 @@ private fun ProviderScreen(onBack: () -> Unit, onContinue: () -> Unit, onSkip: (
             colors = ButtonDefaults.buttonColors(containerColor = VoidColor.Cyan),
             modifier = Modifier.fillMaxWidth()
         ) {
-            Text("Continue")
+            Text("ادامه")
         }
     }
 }

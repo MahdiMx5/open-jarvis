@@ -214,7 +214,7 @@ private fun CollapsedPill(
             Spacer(modifier = Modifier.width(8.dp))
 
             Text(
-                text = "JARVIS",
+                text = "MX5",
                 style = TextStyle(
                     fontFamily = FontFamily.Default,
                     fontWeight = FontWeight(600),
@@ -310,7 +310,7 @@ private fun ExpandedOverlay(
                     IconButton(onClick = onCollapse) {
                         Icon(
                             imageVector = Icons.Default.KeyboardArrowDown,
-                            contentDescription = "Collapse",
+                            contentDescription = "جمع کردن پنجره",
                             tint = VoidColor.TextDisabled
                         )
                     }
@@ -513,7 +513,7 @@ private fun InputRowWithVoice(
                 Box(contentAlignment = Alignment.Center) {
                     Icon(
                         imageVector = Icons.Default.Mic,
-                        contentDescription = "Voice input",
+                        contentDescription = "فرمان صوتی",
                         tint = Color.White,
                         modifier = Modifier
                             .padding(8.dp)
@@ -582,7 +582,7 @@ private fun InputRowWithVoice(
             Box(contentAlignment = Alignment.Center) {
                 Icon(
                     imageVector = Icons.Filled.KeyboardArrowUp,
-                    contentDescription = "Send",
+                    contentDescription = "ارسال فرمان",
                     tint = Color.White,
                     modifier = Modifier.size(16.dp)
                 )
