@@ -1208,7 +1208,7 @@ private fun SupportSection() {
             )
             Spacer(modifier = Modifier.height(10.dp))
             Text(
-                text = "واتساپ: +98 994 516 8729",
+                text = "ارتباط با پشتیبانی از طریق واتساپ",
                 color = VoidColor.TextPrimary,
                 fontSize = 13.sp
             )
