@@ -171,11 +171,11 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner {
                 gravity = Gravity.TOP or Gravity.END
                 y = (72 * resources.displayMetrics.density).toInt()
             }
-            val view = ComposeView(this).apply {
-                setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindow)
-                setViewTreeLifecycleOwner(this@OverlayService)
-                setViewTreeSavedStateRegistryOwner(this@OverlayService)
-                setContent {
+            val view = ComposeView(this)
+            view.setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindow)
+            view.setViewTreeLifecycleOwner(this@OverlayService)
+            view.setViewTreeSavedStateRegistryOwner(this@OverlayService)
+            view.setContent {
                     OpenJarvisTheme {
                         val state by agentCore.state.collectAsState()
                         Box(
