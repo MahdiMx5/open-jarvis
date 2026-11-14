@@ -1223,6 +1223,9 @@ private fun SupportSection() {
                             putExtra(Intent.EXTRA_TEXT, supportMessage)
                         }
                         runCatching { context.startActivity(intent) }
+                            .onFailure {
+                                android.widget.Toast.makeText(context, "برنامه‌ای برای ارسال ایمیل پیدا نشد.", android.widget.Toast.LENGTH_SHORT).show()
+                            }
                     }
                 ) {
                     Text("ارسال ایمیل")
@@ -1232,6 +1235,9 @@ private fun SupportSection() {
                     onClick = {
                         val url = "https://wa.me/$whatsappNumber?text=" + Uri.encode(supportMessage)
                         runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
+                            .onFailure {
+                                android.widget.Toast.makeText(context, "باز کردن واتساپ ممکن نشد.", android.widget.Toast.LENGTH_SHORT).show()
+                            }
                     }
                 ) {
                     Text("واتساپ")
@@ -1250,12 +1256,12 @@ private fun AboutSection() {
         border = BorderStroke(1.dp, VoidColor.BorderSubtle)
     ) {
         Column {
-            AboutRow(title = "Version", value = "${BuildConfig.VERSION_NAME} (build ${BuildConfig.VERSION_CODE})")
+            AboutRow(title = "نسخه", value = "${BuildConfig.VERSION_NAME} (ساخت ${BuildConfig.VERSION_CODE})")
             Divider(thickness = 1.dp, color = VoidColor.BorderSubtle)
-            AboutRow(title = "License", value = "MIT Open Source")
+            AboutRow(title = "مجوز", value = "متن‌باز MIT")
             Divider(thickness = 1.dp, color = VoidColor.BorderSubtle)
             Text(
-                text = "Open Mx5",
+                text = "MX5",
                 style = TextStyle(
                     fontFamily = FontFamily.Default,
                     fontWeight = FontWeight(400),
